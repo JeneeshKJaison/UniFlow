@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniFlow - Student Dashboard</title>
+    <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="css/student.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+</head>
+<body>
+    
+    <div class="student-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar glass-card">
+            <div class="brand">UniFlow</div>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-target="overview"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">home</span> Dashboard Overview</li>
+                <li class="nav-item" data-target="profile"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">person</span> My Profile</li>
+                <li class="nav-item" data-target="courses"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">book</span> My Courses</li>
+                <li class="nav-item" data-target="workload"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">calendar_month</span> Workload & Calendar</li>
+                <li class="nav-item" data-target="grades"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">bar_chart</span> Grades & Results</li>
+                <li class="nav-item" data-target="chat"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">chat</span> Team Chat</li>
+                <li class="nav-item" data-target="grievance"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">report</span> Grievances</li>
+            </ul>
+            <div class="logout-btn" onclick="window.location.href='../index.html'">Logout</div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <h2>Student Portal</h2>
+                <div class="user-profile">
+                    <span id="headerStudentName">Student</span>
+                    <div style="width: 36px; height: 36px; background: var(--primary-color); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center;" id="headerStudentInitials">S</div>
+                </div>
+            </header>
+
+            <!-- Overview Section -->
+            <section id="overview" class="content-section active">
+                <div class="dashboard-grid">
+                    <div class="glass-panel info-card">
+                        <h3>Current Semester</h3>
+                        <p id="stat-semester" style="font-size: 2rem; font-weight: 700; color: var(--primary-color);">6</p>
+                        <p style="font-size: 0.9rem; margin-top: 8px;">B.Tech Computer Science</p>
+                    </div>
+                    <div class="glass-panel info-card">
+                        <h3>Active Courses</h3>
+                        <p id="stat-courses" style="font-size: 2rem; font-weight: 700; color: var(--primary-color);">5</p>
+                        <p style="font-size: 0.9rem; margin-top: 8px;">Enrolled this semester</p>
+                    </div>
+                    <div class="glass-panel info-card">
+                        <h3>Current CGPA</h3>
+                        <p id="stat-cgpa" style="font-size: 2rem; font-weight: 700; color: var(--primary-color);">8.4</p>
+                        <p style="font-size: 0.9rem; margin-top: 8px;">Till Semester 5</p>
+                    </div>
+                </div>
+
+                <div class="glass-panel" style="padding: 24px; margin-top: 24px;">
+                    <h3>Weekly Workload</h3>
+                    <div style="margin-top: 16px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="font-weight: 500; font-size: 0.9rem; color: var(--text-dark);">75% High Workload</span>
+                            <span style="font-weight: 500; font-size: 0.9rem; color: var(--text-dark);">30 hrs / 40 hrs</span>
+                        </div>
+                        <div style="width: 100%; background: rgba(255, 255, 255, 0.4); border-radius: 10px; height: 12px; overflow: hidden; border: 1px solid var(--glass-border);">
+                            <div style="width: 75%; height: 100%; background: linear-gradient(90deg, #f39c12, #e74c3c); border-radius: 10px;"></div>
+                        </div>
+                        <p style="font-size: 0.85rem; margin-top: 10px; color: var(--text-light);">You have a busy week ahead with 2 assignments and 1 mid-term test due.</p>
+                    </div>
+                </div>
+                
+                <div class="glass-panel" style="padding: 24px; margin-top: 24px;">
+                    <h3>Recent Announcements</h3>
+                    <div class="announcement-item">
+                        <div class="announcement-date">Jul 22, 2026</div>
+                        <div class="announcement-title">End Semester Examination Timetable Released</div>
+                        <p>The timetable for the upcoming end semester examinations has been published. Please check the notifications portal for more details.</p>
+                    </div>
+                    <div class="announcement-item">
+                        <div class="announcement-date">Jul 18, 2026</div>
+                        <div class="announcement-title">Project Submission Deadline Extended</div>
+                        <p>The deadline for the final year project submission has been extended by one week.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Profile Section -->
+            <section id="profile" class="content-section">
+                <div class="glass-card info-card">
+                    <h3>Personal Information</h3>
+                    <div class="dashboard-grid" style="margin-top: 16px;">
+                        <div class="info-group">
+                            <label>Student ID</label>
+                            <p id="profile-id">STU10294</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Full Name</label>
+                            <p id="profile-name">Jane Doe</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Email Address</label>
+                            <p id="profile-email">jane.doe@uniflow.edu</p>
+                        </div>
+                    </div>
+                    <div class="dashboard-grid">
+                        <div class="info-group">
+                            <label>Department</label>
+                            <p id="profile-dept">Computer Science & Engineering</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Program</label>
+                            <p id="profile-course">B.Tech</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Admission Year</label>
+                            <p id="profile-year">2023</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Courses Section -->
+            <section id="courses" class="content-section">
+                <div class="glass-panel" style="padding: 24px;">
+                    <h3>Enrolled Courses (Semester 6)</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Course Code</th>
+                                <th>Course Name</th>
+                                <th>Credits</th>
+                                <th>Faculty</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentCourseList">
+                            <tr>
+                                <td>CS302</td>
+                                <td>Compiler Design</td>
+                                <td>4</td>
+                                <td>Dr. Smith</td>
+                                <td><span class="status-badge status-active">Active</span></td>
+                            </tr>
+                            <tr>
+                                <td>CS304</td>
+                                <td>Computer Networks</td>
+                                <td>4</td>
+                                <td>Prof. Johnson</td>
+                                <td><span class="status-badge status-active">Active</span></td>
+                            </tr>
+                            <tr>
+                                <td>CS306</td>
+                                <td>Software Engineering</td>
+                                <td>3</td>
+                                <td>Dr. Alan</td>
+                                <td><span class="status-badge status-active">Active</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Workload & Calendar Section -->
+            <section id="workload" class="content-section">
+                <div class="dashboard-grid">
+                    <!-- Workload Overview -->
+                    <div class="glass-panel" style="padding: 24px;">
+                        <h3>Current Workload</h3>
+                        <div style="margin-top: 16px;">
+                            <div class="info-group">
+                                <label>Pending Assignments</label>
+                                <p style="font-size: 1.5rem; font-weight: 700; color: #f39c12;">3</p>
+                            </div>
+                            <div class="info-group">
+                                <label>Upcoming Tests</label>
+                                <p style="font-size: 1.5rem; font-weight: 700; color: #e74c3c;">2</p>
+                            </div>
+                            <div class="info-group">
+                                <label>Completed Tasks (This Week)</label>
+                                <p style="font-size: 1.5rem; font-weight: 700; color: #27ae60;">5</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mini Calendar UI -->
+                    <div class="glass-panel" style="padding: 24px;">
+                        <h3>Calendar</h3>
+                        <div class="calendar-container" style="margin-top: 16px;">
+                            <div class="calendar-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-weight: 600;">
+                                <span style="cursor: pointer; padding: 4px;">&#10094;</span>
+                                <span>August 2026</span>
+                                <span style="cursor: pointer; padding: 4px;">&#10095;</span>
+                            </div>
+                            <div class="calendar-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center;">
+                                <div style="font-weight: 500; font-size: 0.8rem; color: var(--text-light);">Su</div>
+                                <div style="font-weight: 500; font-size: 0.8rem; color: var(--text-light);">Mo</div>
+                                <div style="font-weight: 500; font-size: 0.8rem; color: var(--text-light);">Tu</div>
+                                <div style="font-weight: 500; font-size: 0.8rem; color: var(--text-light);">We</div>
+                                <div style="font-weight: 500; font-size: 0.8rem; color: var(--text-light);">Th</div>
+                                <div style="font-weight: 500; font-size: 0.8rem; color: var(--text-light);">Fr</div>
+                                <div style="font-weight: 500; font-size: 0.8rem; color: var(--text-light);">Sa</div>
+                                
+                                <!-- Mock Dates -->
+                                <div style="padding: 8px; font-size: 0.9rem; color: var(--text-light);">26</div>
+                                <div style="padding: 8px; font-size: 0.9rem; color: var(--text-light);">27</div>
+                                <div style="padding: 8px; font-size: 0.9rem; color: var(--text-light);">28</div>
+                                <div style="padding: 8px; font-size: 0.9rem; color: var(--text-light);">29</div>
+                                <div style="padding: 8px; font-size: 0.9rem; color: var(--text-light);">30</div>
+                                <div style="padding: 8px; font-size: 0.9rem; color: var(--text-light);">31</div>
+                                <div style="padding: 8px; font-size: 0.9rem;">1</div>
+                                
+                                <div style="padding: 8px; font-size: 0.9rem;">2</div>
+                                <div style="padding: 8px; font-size: 0.9rem;">3</div>
+                                <div style="padding: 8px; font-size: 0.9rem; background: var(--primary-color); color: white; border-radius: 50%; cursor: pointer;" title="CS302 - Compiler Design Assignment 2">4</div>
+                                <div style="padding: 8px; font-size: 0.9rem;">5</div>
+                                <div style="padding: 8px; font-size: 0.9rem;">6</div>
+                                <div style="padding: 8px; font-size: 0.9rem;">7</div>
+                                <div style="padding: 8px; font-size: 0.9rem;">8</div>
+                                
+                                <div style="padding: 8px; font-size: 0.9rem;">9</div>
+                                <div style="padding: 8px; font-size: 0.9rem;">10</div>
+                                <div style="padding: 8px; font-size: 0.9rem;">11</div>
+                                <div style="padding: 8px; font-size: 0.9rem; border: 2px solid #e74c3c; border-radius: 50%; cursor: pointer;" title="CS304 - Networks Mid-Term Test">12</div>
+                                <div style="padding: 8px; font-size: 0.9rem;">13</div>
+                                <div style="padding: 8px; font-size: 0.9rem;">14</div>
+                                <div style="padding: 8px; font-size: 0.9rem;">15</div>
+                            </div>
+                            <div style="margin-top: 12px; font-size: 0.8rem; display: flex; gap: 10px; justify-content: center;">
+                                <div style="display: flex; align-items: center;"><span style="display: inline-block; width: 10px; height: 10px; background: var(--primary-color); border-radius: 50%; margin-right: 4px;"></span>Assignment</div>
+                                <div style="display: flex; align-items: center;"><span style="display: inline-block; width: 10px; height: 10px; border: 2px solid #e74c3c; border-radius: 50%; margin-right: 4px;"></span>Test</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Upcoming Works List -->
+                <div class="glass-panel" style="padding: 24px; margin-top: 24px;">
+                    <h3>Upcoming Works</h3>
+                    <div style="margin-top: 16px;">
+                        <div class="announcement-item" style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div class="announcement-title" style="margin-bottom: 4px;">CS302 - Compiler Design Assignment 2</div>
+                                <p style="font-size: 0.85rem;">Submit PDF report on lexical analyzers.</p>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-weight: 600; color: var(--primary-color);">Due: Aug 4, 2026</div>
+                                <span class="status-badge status-pending" style="display: inline-block; margin-top: 4px;">Pending</span>
+                            </div>
+                        </div>
+                        <div class="announcement-item" style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div class="announcement-title" style="margin-bottom: 4px;">CS304 - Networks Mid-Term Test</div>
+                                <p style="font-size: 0.85rem;">Covering chapters 1-4. Room 402.</p>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-weight: 600; color: #e74c3c;">Aug 12, 2026</div>
+                                <span class="status-badge" style="background: rgba(231, 76, 60, 0.2); color: #e74c3c; display: inline-block; margin-top: 4px;">Upcoming Test</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Grades Section -->
+            <section id="grades" class="content-section">
+                <div class="glass-panel" style="padding: 24px;">
+                    <h3>Previous Semester Results (Semester 5)</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Course Code</th>
+                                <th>Course Name</th>
+                                <th>Credits</th>
+                                <th>Grade</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentGradesList">
+                            <tr>
+                                <td>CS301</td>
+                                <td>Operating Systems</td>
+                                <td>4</td>
+                                <td><strong>A</strong></td>
+                            </tr>
+                            <tr>
+                                <td>CS303</td>
+                                <td>Database Management Systems</td>
+                                <td>4</td>
+                                <td><strong>B+</strong></td>
+                            </tr>
+                            <tr>
+                                <td>CS305</td>
+                                <td>Theory of Computation</td>
+                                <td>3</td>
+                                <td><strong>A-</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Team Chat Section -->
+            <section id="chat" class="content-section">
+                <div class="glass-panel" style="display: flex; height: 600px; overflow: hidden;">
+                    <!-- Chat Sidebar -->
+                    <div style="width: 250px; border-right: 1px solid var(--glass-border); padding: 20px; display: flex; flex-direction: column;">
+                        <h3 style="margin-bottom: 16px;">Groups</h3>
+                        <div style="flex: 1; overflow-y: auto;">
+                            <div style="padding: 12px; background: rgba(11, 122, 117, 0.1); border-radius: var(--border-radius-sm); margin-bottom: 8px; cursor: pointer; border-left: 3px solid var(--primary-color);">
+                                <div style="font-weight: 600;">CS302 Project Group</div>
+                                <div style="font-size: 0.8rem; color: var(--text-light);">You: I'll finish the report...</div>
+                            </div>
+                            <div style="padding: 12px; border-radius: var(--border-radius-sm); margin-bottom: 8px; cursor: pointer;">
+                                <div style="font-weight: 600;">Class of 2027</div>
+                                <div style="font-size: 0.8rem; color: var(--text-light);">Alice: Has anyone done the...</div>
+                            </div>
+                            <div style="padding: 12px; border-radius: var(--border-radius-sm); margin-bottom: 8px; cursor: pointer;">
+                                <div style="font-weight: 600;">Code Club</div>
+                                <div style="font-size: 0.8rem; color: var(--text-light);">Admin: Meeting at 5 PM!</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Chat Area -->
+                    <div style="flex: 1; display: flex; flex-direction: column; background: rgba(255, 255, 255, 0.3);">
+                        <div style="padding: 20px; border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between;">
+                            <div style="font-weight: 600; font-size: 1.1rem;">CS302 Project Group</div>
+                            <div style="font-size: 0.8rem; color: var(--primary-color);">4 Members</div>
+                        </div>
+                        <div style="flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
+                            <!-- Incoming Message -->
+                            <div style="display: flex; gap: 10px;">
+                                <div style="width: 32px; height: 32px; background: #e74c3c; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;">B</div>
+                                <div>
+                                    <div style="font-size: 0.8rem; color: var(--text-light); margin-bottom: 4px;">Bob - 10:30 AM</div>
+                                    <div style="background: var(--glass-bg); padding: 10px 14px; border-radius: 0 12px 12px 12px; border: 1px solid var(--glass-border); max-width: 400px;">
+                                        Hey everyone, did we decide on the frontend framework for the project?
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Outgoing Message -->
+                            <div style="display: flex; gap: 10px; align-self: flex-end; flex-direction: row-reverse;">
+                                <div style="width: 32px; height: 32px; background: var(--primary-color); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;" id="chatSelfAvatar">S</div>
+                                <div>
+                                    <div style="font-size: 0.8rem; color: var(--text-light); margin-bottom: 4px; text-align: right;">You - 10:35 AM</div>
+                                    <div style="background: var(--primary-color); color: white; padding: 10px 14px; border-radius: 12px 0 12px 12px; max-width: 400px;">
+                                        I think we should stick to plain HTML/CSS and JS for simplicity. I'll finish the report tonight.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="padding: 16px; border-top: 1px solid var(--glass-border); background: var(--glass-bg);">
+                            <div style="display: flex; gap: 10px;">
+                                <input type="text" placeholder="Type your message..." style="flex: 1; padding: 12px; border-radius: 20px; border: 1px solid rgba(0,0,0,0.1); outline: none; font-family: 'Poppins', sans-serif;">
+                                <button class="btn-primary" style="border-radius: 20px; padding: 10px 20px;">Send</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Grievance Section -->
+            <section id="grievance" class="content-section">
+                <div class="dashboard-grid">
+                    <div class="glass-card" style="padding: 24px;">
+                        <h3>Submit a Grievance</h3>
+                        <p style="font-size: 0.85rem; margin-bottom: 16px; color: var(--text-light);">Have an issue? Let us know so the administration can help you.</p>
+                        <form id="grievanceForm">
+                            <div class="form-group" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+                                <label style="font-size: 0.9rem; font-weight: 500;">Category</label>
+                                <select style="padding: 10px 14px; border: 1px solid rgba(255, 255, 255, 0.5); background: rgba(255,255,255,0.9); border-radius: var(--border-radius-sm); font-family: 'Poppins', sans-serif;" required>
+                                    <option value="" disabled selected>Select Category</option>
+                                    <option value="academic">Academic Issue</option>
+                                    <option value="facility">Infrastructure/Facility</option>
+                                    <option value="hostel">Hostel/Accommodation</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+                                <label style="font-size: 0.9rem; font-weight: 500;">Subject</label>
+                                <input type="text" placeholder="Brief subject" style="padding: 10px 14px; border: 1px solid rgba(255, 255, 255, 0.5); background: rgba(255,255,255,0.9); border-radius: var(--border-radius-sm); font-family: 'Poppins', sans-serif;" required>
+                            </div>
+                            <div class="form-group" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+                                <label style="font-size: 0.9rem; font-weight: 500;">Description</label>
+                                <textarea rows="4" placeholder="Detail your grievance here..." style="padding: 10px 14px; border: 1px solid rgba(255, 255, 255, 0.5); background: rgba(255,255,255,0.9); border-radius: var(--border-radius-sm); font-family: 'Poppins', sans-serif; resize: vertical;" required></textarea>
+                            </div>
+                            <button type="submit" class="btn-primary">Submit Grievance</button>
+                        </form>
+                    </div>
+
+                    <div class="glass-panel" style="padding: 24px;">
+                        <h3>My Grievances</h3>
+                        <div style="margin-top: 16px;">
+                            <div class="announcement-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div>
+                                    <div class="announcement-title" style="margin-bottom: 4px;">Library Wi-Fi Connectivity</div>
+                                    <p style="font-size: 0.85rem;">The Wi-Fi in the reading room keeps dropping.</p>
+                                    <div style="font-size: 0.8rem; color: var(--text-light); margin-top: 4px;">Submitted: Jul 10, 2026 &bull; Category: Facility</div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span class="status-badge" style="background: rgba(46, 204, 113, 0.2); color: #27ae60; display: inline-block;">Resolved</span>
+                                </div>
+                            </div>
+                            <div class="announcement-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div>
+                                    <div class="announcement-title" style="margin-bottom: 4px;">Grade Discrepancy in CS301</div>
+                                    <p style="font-size: 0.85rem;">My mid-term marks are not updated correctly on the portal.</p>
+                                    <div style="font-size: 0.8rem; color: var(--text-light); margin-top: 4px;">Submitted: Jul 21, 2026 &bull; Category: Academic</div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span class="status-badge status-pending" style="display: inline-block;">Under Review</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="js/student.js"></script>
+</body>
+</html>

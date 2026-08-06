@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniFlow - Login</title>
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+    
+    <div class="login-container">
+        <!-- Floating decorative elements -->
+        <div class="decoration shape-1"></div>
+        <div class="decoration shape-2"></div>
+        
+        <main class="login-card glass-card">
+            <div class="login-header">
+                <h2>UniFlow</h2>
+                <p>Welcome back! Please login to your account.</p>
+            </div>
+
+            <form id="loginForm" class="login-form">
+                
+
+                <div class="input-group">
+                    <label for="email">Email address</label>
+                    <input type="email" id="email" name="email" placeholder="e.g. user@uniflow.edu" required>
+                </div>
+
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                </div>
+
+                <div class="form-actions">
+                    <label class="remember-me">
+                        <input type="checkbox" name="remember"> Remember me
+                    </label>
+                    <a href="#" class="forgot-password">Forgot Password?</a>
+                </div>
+
+                <button type="submit" class="btn-primary login-btn">Login</button>
+            </form>
+        </main>
+    </div>
+
+    <script src="js/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniFlow - HOD Dashboard</title>
+    <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="../admin/css/admin.css"> <!-- Reuse admin sidebar & grid styles -->
+    <link rel="stylesheet" href="css/hod.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+</head>
+<body>
+    
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar glass-card">
+            <div class="brand">UniFlow HOD</div>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-target="overview"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">home</span> Overview & Workload</li>
+                <li class="nav-item" data-target="subjects"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">book</span> Subjects</li>
+                <li class="nav-item" data-target="timetable"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">calendar_view_week</span> Timetable</li>
+                <li class="nav-item" data-target="tasks"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">task</span> Task Assignment</li>
+                <li class="nav-item" data-target="calendar"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">calendar_month</span> Calendar</li>
+                <li class="nav-item" data-target="chat"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">chat</span> Team Chat</li>
+                <li class="nav-item" data-target="grievances"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">report</span> Grievances</li>
+                <li class="nav-item" data-target="faculties"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">group</span> Faculties Directory</li>
+                <li class="nav-item" data-target="profile"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">manage_accounts</span> My Profile</li>
+            </ul>
+            <div class="logout-btn" onclick="window.location.href='../index.html'">Logout</div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <h2 id="deptTitle">Department Console</h2>
+                <div class="user-profile">
+                    <span id="hodNameDisplay">HOD</span>
+                    <div style="width: 36px; height: 36px; background: var(--primary-color); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center;">H</div>
+                </div>
+            </header>
+
+            <!-- Overview Section -->
+            <section id="overview" class="content-section active">
+                <div class="dashboard-grid">
+                    <div class="glass-panel" style="padding: 24px;">
+                        <h3>Total Faculty</h3>
+                        <p id="stat-faculty" style="font-size: 2rem; font-weight: 700; color: var(--primary-color);">0</p>
+                    </div>
+                    <div class="glass-panel" style="padding: 24px;">
+                        <h3>Total Students</h3>
+                        <p id="stat-students" style="font-size: 2rem; font-weight: 700; color: var(--primary-color);">0</p>
+                    </div>
+                    <div class="glass-panel" style="padding: 24px;">
+                        <h3>Active Tasks</h3>
+                        <p id="stat-tasks" style="font-size: 2rem; font-weight: 700; color: var(--primary-color);">0</p>
+                    </div>
+                </div>
+
+                <!-- Toggle Control -->
+                <div class="view-toggle" style="margin-top: 24px; display: flex; gap: 16px; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 16px;">
+                    <button id="btnFacultyView" class="btn-primary" style="padding: 8px 16px; border-radius: 20px; transition: all 0.3s;">Faculty Workload</button>
+                    <button id="btnStudentView" style="padding: 8px 16px; border-radius: 20px; background: transparent; border: 1px solid var(--primary-color); color: var(--text-light); cursor: pointer; transition: all 0.3s;">Student Overview</button>
+                </div>
+
+                <!-- Faculty Overview Container -->
+                <div id="facultyOverviewContainer">
+                    <div class="glass-panel" style="padding: 24px; margin-top: 24px;">
+                        <h3>Faculty Workload</h3>
+                        <p style="color:var(--text-light); margin-bottom: 16px;">Workload is calculated based on active tasks and their difficulty level.</p>
+                        <div id="workloadContainer" class="workload-list">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <div class="glass-panel" style="padding: 24px; margin-top: 24px;">
+                        <h3>Tasks Nearing Deadline</h3>
+                        <table style="margin-top:16px;">
+                            <thead>
+                                <tr>
+                                    <th>Task</th>
+                                    <th>Assigned To</th>
+                                    <th>Difficulty</th>
+                                    <th>Deadline</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="urgentTasksList">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Student Overview Container -->
+                <div id="studentOverviewContainer" style="display: none;">
+                    <div class="glass-panel" style="padding: 24px; margin-top: 24px;">
+                        <h3>Class Workload & Performance</h3>
+                        <div class="filter-bar" style="margin-top: 16px; display: flex; gap: 16px;">
+                            <div class="form-group" style="margin: 0; min-width: 150px;">
+                                <label>Course</label>
+                                <select id="studentCourseFilter">
+                                    <option value="all">All Courses</option>
+                                    <option value="BTech CS">BTech CS</option>
+                                    <option value="BTech AI">BTech AI</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin: 0; min-width: 150px;">
+                                <label>Semester</label>
+                                <select id="studentSemesterFilter">
+                                    <option value="all">All Semesters</option>
+                                    <option value="1">Semester 1</option>
+                                    <option value="3">Semester 3</option>
+                                    <option value="5">Semester 5</option>
+                                    <option value="7">Semester 7</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 24px;">
+                            <h4 style="color: var(--primary-color);">Class Workload</h4>
+                            <div id="classWorkloadContainer" class="dashboard-grid" style="margin-top: 12px;">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 24px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h4 style="color: var(--primary-color);">Student Performance List</h4>
+                                <div class="form-group" style="margin: 0; min-width: 200px;">
+                                    <select id="studentCategoryFilter" style="padding: 8px; border-radius: 8px; border: 1px solid var(--glass-border); background: var(--glass-bg); color: var(--text-color);">
+                                        <option value="all">Sort: All Students</option>
+                                        <option value="high">Sort: High Performers (>80%)</option>
+                                        <option value="attention">Sort: Needs Attention (<50%)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <table style="margin-top:16px;">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Semester</th>
+                                        <th>Workload Load</th>
+                                        <th>Performance Score</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="studentPerformanceList">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Subjects Management Section -->
+            <section id="subjects" class="content-section">
+                <div class="glass-panel" style="padding: 24px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                        <h3>Subjects Management</h3>
+                        <div class="filter-bar" style="display: flex; gap: 16px; margin: 0;">
+                            <div class="form-group" style="margin: 0;">
+                                <label>Course</label>
+                                <select id="subjectManageCourseFilter">
+                                    <option value="BTech CS">BTech CS</option>
+                                    <option value="BTech AI">BTech AI</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label>Semester</label>
+                                <select id="subjectManageSemesterFilter">
+                                    <option value="1">Semester 1</option>
+                                    <option value="3">Semester 3</option>
+                                    <option value="5">Semester 5</option>
+                                    <option value="7">Semester 7</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-grid" style="margin-top: 24px;">
+                        <div class="glass-card form-card">
+                            <h3>Add New Subject</h3>
+                            <form id="addSubjectForm" style="margin-top: 16px;">
+                                <div class="form-group">
+                                    <label>Subject Name</label>
+                                    <input type="text" id="newSubjectName" required placeholder="e.g. Data Structures">
+                                </div>
+                                <button type="submit" class="btn-primary" style="margin-top: 10px;">Add Subject</button>
+                            </form>
+                        </div>
+                        
+                        <div class="glass-panel" style="padding: 24px; height: fit-content;">
+                            <h3>Subjects List</h3>
+                            <table style="margin-top: 16px;">
+                                <thead>
+                                    <tr>
+                                        <th>Subject Name</th>
+                                        <th>Course</th>
+                                        <th>Semester</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="subjectsListBody">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Timetable Section -->
+            <section id="timetable" class="content-section">
+                <div class="glass-panel" style="padding: 24px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                        <h3>Timetable Builder</h3>
+                        <div class="filter-bar" style="display: flex; gap: 16px; margin: 0;">
+                            <div class="form-group" style="margin: 0;">
+                                <label>Course</label>
+                                <select id="timetableCourseFilter">
+                                    <option value="BTech CS">BTech CS</option>
+                                    <option value="BTech AI">BTech AI</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label>Semester</label>
+                                <select id="timetableSemesterFilter">
+                                    <option value="1">Semester 1</option>
+                                    <option value="3">Semester 3</option>
+                                    <option value="5">Semester 5</option>
+                                    <option value="7">Semester 7</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="table-responsive" style="margin-top: 24px; overflow-x: auto;">
+                        <table class="timetable-grid" style="min-width: 800px; text-align: center; border-collapse: collapse; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th style="padding: 12px; border: 1px solid var(--glass-border);">Day</th>
+                                    <th style="padding: 12px; border: 1px solid var(--glass-border);">Period 1<br><small style="font-weight: normal;">09:00 - 10:00</small></th>
+                                    <th style="padding: 12px; border: 1px solid var(--glass-border);">Period 2<br><small style="font-weight: normal;">10:00 - 11:00</small></th>
+                                    <th style="padding: 12px; border: 1px solid var(--glass-border);">Period 3<br><small style="font-weight: normal;">11:15 - 12:15</small></th>
+                                    <th style="padding: 12px; border: 1px solid var(--glass-border);">Period 4<br><small style="font-weight: normal;">13:15 - 14:15</small></th>
+                                    <th style="padding: 12px; border: 1px solid var(--glass-border);">Period 5<br><small style="font-weight: normal;">14:15 - 15:15</small></th>
+                                    <th style="padding: 12px; border: 1px solid var(--glass-border);">Period 6<br><small style="font-weight: normal;">15:30 - 16:30</small></th>
+                                </tr>
+                            </thead>
+                            <tbody id="timetableBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="margin-top: 24px; text-align: right;">
+                        <button id="saveTimetableBtn" class="btn-primary">Save Timetable</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Task Assignment Section -->
+            <section id="tasks" class="content-section">
+                <div class="dashboard-grid">
+                    <div class="glass-card form-card">
+                        <h3>Assign New Task</h3>
+                        <form id="assignTaskForm" style="margin-top: 16px;">
+                            <div class="form-group">
+                                <label>Assign To (Faculty)</label>
+                                <select id="taskAssignee" required></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Task Description</label>
+                                <input type="text" id="taskDesc" required placeholder="e.g. Prepare Question Paper">
+                            </div>
+                            <div class="form-group">
+                                <label>Difficulty Level (1-10)</label>
+                                <input type="number" id="taskDifficulty" min="1" max="10" required placeholder="e.g. 5">
+                            </div>
+                            <div class="form-group">
+                                <label>Deadline Date</label>
+                                <input type="date" id="taskDeadline" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Attachment (Optional)</label>
+                                <input type="file" id="taskAttachment" style="padding: 8px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid var(--glass-border); width: 100%; color: var(--text-color);">
+                            </div>
+                            <button type="submit" class="btn-primary" style="margin-top: 10px;">Assign Task</button>
+                        </form>
+                    </div>
+
+                    <div class="glass-panel" style="padding: 24px; height: fit-content;">
+                        <h3>All Active Tasks</h3>
+                        <table style="margin-top: 16px;">
+                            <thead>
+                                <tr>
+                                    <th>Task</th>
+                                    <th>Assigned To</th>
+                                    <th>Deadline</th>
+                                    <th>Attachment</th>
+                                </tr>
+                            </thead>
+                            <tbody id="allTasksList">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Calendar Section -->
+            <section id="calendar" class="content-section">
+                <div class="glass-panel" style="padding: 24px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                        <h3>Task Calendar</h3>
+                        <div>
+                            <button id="prevMonth" class="action-btn">&lt;</button>
+                            <span id="currentMonthYear" style="font-weight: 600; margin: 0 16px; min-width: 120px; display: inline-block; text-align: center;">Month Year</span>
+                            <button id="nextMonth" class="action-btn">&gt;</button>
+                        </div>
+                    </div>
+                    
+                    <div class="calendar-container">
+                        <div class="calendar-header-grid">
+                            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                        </div>
+                        <div class="calendar-grid" id="calendarGrid">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <div id="calendarTaskDetails" style="margin-top: 24px; display: none; padding-top: 20px; border-top: 1px solid var(--glass-border);">
+                        <h4 style="margin-bottom: 12px; color: var(--primary-color);">Tasks for <span id="selectedDateDisplay"></span></h4>
+                        <div id="selectedDateTasks" style="display: flex; flex-direction: column; gap: 12px;">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Team Chat Section -->
+            <section id="chat" class="content-section" style="height: calc(100vh - 160px);">
+                <div class="glass-panel" style="padding: 0; display: flex; height: 100%; overflow: hidden;">
+                    <!-- Chat Sidebar (Contacts) -->
+                    <div style="width: 320px; border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; background: rgba(0,0,0,0.2);">
+                        <div style="padding: 16px; border-bottom: 1px solid var(--glass-border);">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h3 style="font-size: 1.2rem; margin: 0;">Chats</h3>
+                                <div style="display: flex; gap: 8px;">
+                                    <button id="btnNewChat" class="action-btn" title="New Chat" style="width: 32px; height: 32px; padding: 0;">➕</button>
+                                    <button id="btnNewGroup" class="action-btn" title="New Group" style="width: 32px; height: 32px; padding: 0;">👥</button>
+                                </div>
+                            </div>
+                            <input type="text" placeholder="Search chats..." style="width: 100%; margin-top: 12px; padding: 10px; border-radius: 20px; border: none; background: rgba(255,255,255,0.1); color: var(--text-color); outline: none;">
+                        </div>
+                        <div id="chatContactsList" style="flex: 1; overflow-y: auto;">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                    
+                    <!-- Chat Main Area -->
+                    <div style="flex: 1; display: flex; flex-direction: column;">
+                        <!-- Chat Header -->
+                        <div style="padding: 16px; border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.05);">
+                            <div id="activeChatAvatar" style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">G</div>
+                            <div>
+                                <h4 id="activeChatName" style="margin: 0; font-size: 1.1rem;">Department Group</h4>
+                                <small id="activeChatSub" style="color: var(--text-light);">All Enrolled Users</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Messages Area -->
+                        <div id="chatMessages" style="flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
+                            <!-- Populated by JS -->
+                        </div>
+                        
+                        <!-- Input Area -->
+                        <form id="chatForm" style="padding: 16px; border-top: 1px solid var(--glass-border); display: flex; gap: 12px; background: rgba(0,0,0,0.2); align-items: center;">
+                            <div style="cursor: pointer; color: var(--text-light); font-size: 1.4rem; padding: 0 8px;" title="Attach File">📎</div>
+                            <input type="text" id="chatInput" placeholder="Type a message..." required autocomplete="off" style="flex: 1; padding: 14px 20px; border-radius: 24px; border: none; background: rgba(255,255,255,0.1); color: var(--text-color); outline: none;">
+                            <button type="submit" class="btn-primary" style="border-radius: 24px; padding: 12px 24px; display: flex; align-items: center; gap: 8px;">
+                                Send
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Grievances Section -->
+            <section id="grievances" class="content-section">
+                <div class="glass-panel" style="padding: 24px;">
+                    <h3>Faculty Grievances</h3>
+                    <table style="margin-top: 16px;">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>From</th>
+                                <th>Subject</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="grievanceList">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Faculties Section -->
+            <section id="faculties" class="content-section">
+                <div class="glass-panel" style="padding: 24px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid var(--glass-border); padding-bottom: 16px;">
+                        <h3>Faculties Directory</h3>
+                        <div class="view-toggle" style="display: flex; gap: 16px;">
+                            <button id="btnFacultiesMyDept" class="btn-primary" style="padding: 8px 16px; border-radius: 20px; transition: all 0.3s;">My Department</button>
+                            <button id="btnFacultiesAll" style="padding: 8px 16px; border-radius: 20px; background: transparent; border: 1px solid var(--primary-color); color: var(--text-light); cursor: pointer; transition: all 0.3s;">All Faculties</button>
+                            <button id="btnFacultiesHods" style="padding: 8px 16px; border-radius: 20px; background: transparent; border: 1px solid var(--primary-color); color: var(--text-light); cursor: pointer; transition: all 0.3s;">University HODs</button>
+                        </div>
+                    </div>
+                    
+                    <!-- My Department View -->
+                    <div id="facultiesMyDeptView">
+                        <table style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="facultiesMyDeptList">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- All Faculties View -->
+                    <div id="facultiesAllView" style="display: none;">
+                        <div class="filter-bar" style="margin-bottom: 16px; display: flex; gap: 16px;">
+                            <div class="form-group" style="margin: 0;">
+                                <label>Filter by Department</label>
+                                <select id="facultiesDeptFilter">
+                                    <option value="All">All Departments</option>
+                                    <option value="Computer Science">Computer Science</option>
+                                    <option value="Mathematics">Mathematics</option>
+                                    <option value="Electronics">Electronics</option>
+                                </select>
+                            </div>
+                        </div>
+                        <table style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Department</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="facultiesAllList">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Other HODs View -->
+                    <div id="facultiesHodsView" style="display: none;">
+                        <div class="hod-grid" id="otherHodsList">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Profile Section -->
+            <section id="profile" class="content-section">
+                <div class="glass-card form-card" style="max-width: 500px;">
+                    <h3>Update Profile Settings</h3>
+                    <form id="profileForm" style="margin-top: 16px;">
+                        <div class="form-group">
+                            <label>HOD Name</label>
+                            <input type="text" id="profileName" disabled>
+                            <small>Contact Admin to change name.</small>
+                        </div>
+                        <div class="form-group">
+                            <label>New Password</label>
+                            <input type="password" id="profilePassword" required placeholder="Enter new password">
+                        </div>
+                        <button type="submit" class="btn-primary" style="margin-top: 10px;">Update Password</button>
+                    </form>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Grievance Modal -->
+    <div class="modal-overlay" id="grievanceModal">
+        <div class="glass-card modal-card">
+            <span class="close-modal" id="closeGrievanceModal">&times;</span>
+            <h3>Grievance Details</h3>
+            <div id="grievanceDetails" style="margin-top: 16px; margin-bottom: 16px;"></div>
+            <div id="grievanceResolutionSection" style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px; color: var(--text-light);">Resolution Remarks:</label>
+                <textarea id="grievanceRemarks" rows="3" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-color); resize: vertical; outline: none;" placeholder="Enter remarks to resolve..."></textarea>
+            </div>
+            <div id="grievanceActionButtons" style="display: flex; gap: 12px; margin-top: 16px;">
+                <button class="btn-primary" id="sendRemarkBtn" style="flex: 1; background: transparent; border: 1px solid var(--primary-color); color: var(--text-color);">Send Remark</button>
+                <button class="btn-primary" id="resolveGrievanceBtn" style="flex: 1;">Mark as Resolved</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timetable Assignment Modal -->
+    <div class="modal-overlay" id="timetableModal">
+        <div class="glass-card modal-card">
+            <span class="close-modal" id="closeTimetableModal">&times;</span>
+            <h3>Assign Class</h3>
+            <p id="timetableSlotLabel" style="color: var(--text-light); margin-bottom: 16px;">Monday - Period 1</p>
+            <form id="timetableAssignForm">
+                <div class="form-group">
+                    <label>Select Subject</label>
+                    <select id="ttSubjectSelect" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Assign Faculty (Ctrl/Cmd+Click for multiple)</label>
+                    <select id="ttFacultySelect" multiple size="4" required style="height: auto; padding: 8px;"></select>
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                    <button type="submit" class="btn-primary" style="flex: 1;">Assign</button>
+                    <button type="button" id="ttClearBtn" style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #e53e3e; background: transparent; color: #e53e3e; cursor: pointer; transition: all 0.3s;">Clear Slot</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- New Chat Modal -->
+    <div class="modal-overlay" id="newChatModal">
+        <div class="glass-card modal-card">
+            <span class="close-modal" id="closeNewChatModal">&times;</span>
+            <h3>Start New Chat</h3>
+            <form id="newChatForm" style="margin-top: 16px;">
+                <div class="form-group">
+                    <label>Select User</label>
+                    <input type="text" id="searchNewChatUser" placeholder="Search user..." style="margin-bottom: 8px; width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-color);">
+                    <select id="newChatUserSelect" required size="5" style="height: auto; padding: 8px;"></select>
+                </div>
+                <button type="submit" class="btn-primary" style="margin-top: 10px;">Start Chat</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- New Group Modal -->
+    <div class="modal-overlay" id="newGroupModal">
+        <div class="glass-card modal-card">
+            <span class="close-modal" id="closeNewGroupModal">&times;</span>
+            <h3>Create New Group</h3>
+            <form id="newGroupForm" style="margin-top: 16px;">
+                <div class="form-group">
+                    <label>Group Name</label>
+                    <input type="text" id="newGroupNameInput" required placeholder="e.g. Project Committee">
+                </div>
+                <div class="form-group">
+                    <label>Add Members (Ctrl/Cmd+Click for multiple)</label>
+                    <input type="text" id="searchNewGroupUser" placeholder="Search user..." style="margin-bottom: 8px; width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-color);">
+                    <select id="newGroupMembersSelect" multiple size="5" required style="height: auto; padding: 8px;"></select>
+                </div>
+                <button type="submit" class="btn-primary" style="margin-top: 10px;">Create Group</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/hod.js"></script>
+</body>
+</html>
