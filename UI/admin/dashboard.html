@@ -17,6 +17,7 @@
             <ul class="nav-menu">
                 <li class="nav-item active" data-target="overview"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">home</span> Dashboard Overview</li>
                 <li class="nav-item" data-target="departments"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">domain</span> Manage Departments</li>
+                <li class="nav-item" data-target="hods"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">badge</span> Manage HOD Credentials</li>
                 <li class="nav-item" data-target="courses"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">menu_book</span> Manage Courses</li>
                 <li class="nav-item" data-target="users"><span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle; font-size: 20px;">group</span> Manage Users</li>
             </ul>
@@ -41,8 +42,20 @@
                         <p id="stat-departments" style="font-size: 2rem; font-weight: 700; color: var(--primary-color);">0</p>
                     </div>
                     <div class="glass-panel" style="padding: 24px;">
+                        <h3>Assigned HODs</h3>
+                        <p id="stat-hods" style="font-size: 2rem; font-weight: 700; color: var(--primary-color);">0</p>
+                    </div>
+                    <div class="glass-panel" style="padding: 24px;">
                         <h3>Total Courses</h3>
                         <p id="stat-courses" style="font-size: 2rem; font-weight: 700; color: var(--primary-color);">0</p>
+                    </div>
+                    <div class="glass-panel" style="padding: 24px;">
+                        <h3>Total Faculty</h3>
+                        <p id="stat-faculty" style="font-size: 2rem; font-weight: 700; color: var(--primary-color);">0</p>
+                    </div>
+                    <div class="glass-panel" style="padding: 24px;">
+                        <h3>Total Students</h3>
+                        <p id="stat-students" style="font-size: 2rem; font-weight: 700; color: var(--primary-color);">0</p>
                     </div>
                     <div class="glass-panel" style="padding: 24px;">
                         <h3>Total Users</h3>
@@ -70,7 +83,8 @@
                     </div>
 
                     <div class="glass-card form-card">
-                        <h3>Assign HOD</h3>
+                        <h3>Quick Assign HOD</h3>
+                        <p class="section-desc">Assign a faculty member as HOD or go to the HOD Credentials section to configure custom credentials.</p>
                         <form id="assignHodForm" style="margin-top: 16px;">
                             <div class="form-group">
                                 <label>Select Department</label>
@@ -86,17 +100,84 @@
                 </div>
                 
                 <div class="glass-panel" style="padding: 24px;">
-                    <h3>Department List</h3>
+                    <h3>Department Directory</h3>
                     <table>
                         <thead>
                             <tr>
                                 <th>Department ID</th>
                                 <th>Name</th>
                                 <th>Current HOD</th>
+                                <th>HOD Login Email</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="departmentList">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Manage HOD Credentials Section -->
+            <section id="hods" class="content-section">
+                <div class="glass-card form-card">
+                    <h3>Configure Department HOD Credentials</h3>
+                    <p class="section-desc">Each department has its own Head of Department (HOD). Admin can set up and manage unique login credentials (Email & Password) for each department's HOD.</p>
+                    
+                    <form id="hodCredentialsForm" style="margin-top: 16px;">
+                        <div class="dashboard-grid">
+                            <div class="form-group">
+                                <label>Select Department</label>
+                                <select id="hodCredDeptSelect" required></select>
+                            </div>
+                            <div class="form-group">
+                                <label>HOD Employee / Faculty ID</label>
+                                <input type="text" id="hodCredCustomId" required placeholder="e.g. HOD-CS01">
+                            </div>
+                            <div class="form-group">
+                                <label>HOD Full Name</label>
+                                <input type="text" id="hodCredName" required placeholder="e.g. Dr. Alan Turing">
+                            </div>
+                        </div>
+
+                        <div class="dashboard-grid">
+                            <div class="form-group">
+                                <label>HOD Login Email (Department-Specific)</label>
+                                <input type="email" id="hodCredEmail" required placeholder="e.g. hod.cs@uniflow.edu">
+                                <span class="field-hint">Unique email used by this HOD to log in.</span>
+                            </div>
+                            <div class="form-group">
+                                <label>HOD Login Password</label>
+                                <div class="password-input-wrap">
+                                    <input type="password" id="hodCredPassword" required placeholder="Enter password for HOD" minlength="4">
+                                    <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('hodCredPassword', this)" title="Show/Hide Password">
+                                        <span class="material-symbols-outlined">visibility</span>
+                                    </button>
+                                </div>
+                                <span class="field-hint">Password used by this HOD to access the HOD console.</span>
+                            </div>
+                            <div class="form-group" style="display: flex; justify-content: flex-end; align-items: flex-end;">
+                                <button type="submit" class="btn-primary" style="height: 42px; width: 100%;">Save HOD Credentials</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="glass-panel" style="padding: 24px;">
+                    <h3>Department HODs & Login Credentials Directory</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Department</th>
+                                <th>HOD Name</th>
+                                <th>HOD ID</th>
+                                <th>Login Email</th>
+                                <th>Login Password</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hodCredentialsList">
                             <!-- Populated via JS -->
                         </tbody>
                     </table>
@@ -145,11 +226,12 @@
             <!-- Users Section -->
             <section id="users" class="content-section">
                 <div class="glass-card form-card">
-                    <h3>Enroll New User</h3>
+                    <h3>Enroll New User (Faculty / Student)</h3>
+                    <p class="section-desc">Create accounts for students and faculty members. Enter their login password which they will use to log into UniFlow.</p>
                     <form id="addUserForm" style="margin-top: 16px;">
                         <div class="dashboard-grid">
                             <div class="form-group">
-                                <label>User ID (Unique)</label>
+                                <label>User ID (Unique Roll / Employee ID)</label>
                                 <input type="text" id="userCustomId" required placeholder="e.g. STU001 or FAC001">
                             </div>
                             <div class="form-group">
@@ -157,7 +239,7 @@
                                 <input type="text" id="userName" required placeholder="John Doe">
                             </div>
                             <div class="form-group">
-                                <label>Email Address</label>
+                                <label>Email Address (Login Username)</label>
                                 <input type="email" id="userEmail" required placeholder="john@uniflow.edu">
                             </div>
                         </div>
@@ -173,6 +255,16 @@
                             <div class="form-group">
                                 <label>Department</label>
                                 <select id="userDeptSelect" required style="height: 40px;"></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Login Password</label>
+                                <div class="password-input-wrap">
+                                    <input type="password" id="userPassword" required placeholder="Create login password" minlength="4">
+                                    <button type="button" class="toggle-password-btn" onclick="togglePasswordVisibility('userPassword', this)" title="Show/Hide Password">
+                                        <span class="material-symbols-outlined">visibility</span>
+                                    </button>
+                                </div>
+                                <span class="field-hint">Password user will enter on the login screen.</span>
                             </div>
                         </div>
 
@@ -196,8 +288,8 @@
                     
                     <div class="filter-bar glass-card" style="padding: 16px; border-radius: var(--border-radius-sm);">
                         <div class="form-group" style="margin: 0; min-width: 150px;">
-                            <label>Search User ID</label>
-                            <input type="text" id="filterUserId" placeholder="Enter ID..." style="height: 40px; padding: 0 10px;">
+                            <label>Search User ID / Name</label>
+                            <input type="text" id="filterUserId" placeholder="Enter ID or Name..." style="height: 40px; padding: 0 10px;">
                         </div>
                         <div class="form-group" style="margin: 0; min-width: 150px;">
                             <label>View Role</label>
@@ -205,6 +297,7 @@
                                 <option value="all">All</option>
                                 <option value="student">Students</option>
                                 <option value="faculty">Faculty</option>
+                                <option value="hod">HODs</option>
                             </select>
                         </div>
                         <div class="form-group" style="margin: 0; min-width: 200px;">
@@ -229,6 +322,8 @@
                                 <th>Role</th>
                                 <th>Dept(s)</th>
                                 <th>Course/Sem</th>
+                                <th>Login Email</th>
+                                <th>Password</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>

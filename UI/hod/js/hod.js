@@ -1,13 +1,30 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- Mock Data Store ---
-    // Simulating logged-in HOD Context
-    const currentHod = { id: 1, name: 'Dr. Alan Turing', email: 'hod@uniflow.edu', deptId: 1, deptName: 'Computer Science' };
+    // --- Mock Data Store & Logged-in HOD Context ---
+    let currentHod = { id: 1, name: 'Dr. Alan Turing', email: 'hod.cs@uniflow.edu', deptId: 1, deptName: 'Computer Science' };
+    const storedUser = localStorage.getItem('uniflow_currentUser');
+    if (storedUser) {
+        try {
+            const parsed = JSON.parse(storedUser);
+            if (parsed && (parsed.role === 'hod' || parsed.isHOD)) {
+                currentHod = {
+                    id: parsed.id || 1,
+                    name: parsed.name || 'HOD',
+                    email: parsed.email || 'hod@uniflow.edu',
+                    deptId: parsed.deptId || 1,
+                    deptName: parsed.deptName || 'Department'
+                };
+            }
+        } catch(e) {
+            console.error(e);
+        }
+    }
     
     // Set UI labels
-    document.getElementById('hodNameDisplay').textContent = currentHod.name;
-    document.getElementById('deptTitle').textContent = `${currentHod.deptName} Console`;
-    document.getElementById('profileName').value = currentHod.name;
+    if (document.getElementById('hodNameDisplay')) document.getElementById('hodNameDisplay').textContent = currentHod.name;
+    if (document.getElementById('deptTitle')) document.getElementById('deptTitle').textContent = `${currentHod.deptName} Console`;
+    if (document.getElementById('profileName')) document.getElementById('profileName').value = `${currentHod.name} (${currentHod.email})`;
+
 
     const dataStore = {
         users: [

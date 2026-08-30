@@ -127,3 +127,99 @@
     margin-top: 10px;
     font-size: 1.05rem;
 }
+
+/* Password field wrapper */
+.password-input-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-group input {
+    width: 100%;
+    padding-right: 42px;
+}
+
+.pwd-toggle-btn {
+    position: absolute;
+    right: 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.pwd-toggle-btn:hover {
+    color: var(--primary-color);
+}
+
+/* Demo Credentials Box */
+.demo-credentials-box {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.45);
+    border: 1px dashed rgba(11, 122, 117, 0.3);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.82rem;
+}
+
+.demo-title {
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+}
+
+.demo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.demo-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.demo-item:hover {
+    background: rgba(11, 122, 117, 0.1);
+}
+
+.demo-role {
+    font-weight: 500;
+    color: var(--text-dark);
+}
+
+.demo-email {
+    font-family: 'Courier New', monospace;
+    color: var(--primary-color);
+    font-size: 0.8rem;
+}
+
+.error-banner {
+    display: none;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #b91c1c;
+    padding: 10px 14px;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.88rem;
+    font-weight: 500;
+    margin-bottom: 12px;
+    text-align: center;
+}
+

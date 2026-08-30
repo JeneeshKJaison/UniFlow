@@ -1,13 +1,31 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- Mock Data Store ---
-    // Simulating logged-in Faculty Context
-    const currentFaculty = { id: 2, customId: 'FAC002', name: 'Grace Hopper', email: 'faculty@uniflow.edu', deptId: 1, deptName: 'Computer Science' };
+    // --- Mock Data Store & Dynamic Logged-in Faculty Context ---
+    let currentFaculty = { id: 2, customId: 'FAC001', name: 'Grace Hopper', email: 'faculty@uniflow.edu', deptId: 1, deptName: 'Computer Science' };
+    const storedUser = localStorage.getItem('uniflow_currentUser');
+    if (storedUser) {
+        try {
+            const parsed = JSON.parse(storedUser);
+            if (parsed && parsed.role === 'faculty') {
+                currentFaculty = {
+                    id: parsed.id || 2,
+                    customId: parsed.customId || 'FAC',
+                    name: parsed.name || 'Faculty Member',
+                    email: parsed.email || 'faculty@uniflow.edu',
+                    deptId: parsed.deptId || 1,
+                    deptName: parsed.deptName || 'Computer Science'
+                };
+            }
+        } catch(e) {
+            console.error(e);
+        }
+    }
     
     // Set UI labels
-    document.getElementById('facultyNameDisplay').textContent = currentFaculty.name;
-    document.getElementById('deptTitle').textContent = `${currentFaculty.deptName} Department`;
-    document.getElementById('profileName').value = currentFaculty.name;
+    if (document.getElementById('facultyNameDisplay')) document.getElementById('facultyNameDisplay').textContent = currentFaculty.name;
+    if (document.getElementById('deptTitle')) document.getElementById('deptTitle').textContent = `${currentFaculty.deptName} Department`;
+    if (document.getElementById('profileName')) document.getElementById('profileName').value = currentFaculty.name;
+
 
     const dataStore = {
         users: [
