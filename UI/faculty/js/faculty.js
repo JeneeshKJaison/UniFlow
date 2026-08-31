@@ -52,10 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'Thu-4': { subjectId: 1, facultyIds: [2] }
         },
         // Tasks assigned BY the HOD TO the faculty
-        facultyTasks: [
-            { id: 1, assigneeId: 2, desc: 'Prepare Midterm Paper for OS', difficulty: 7, deadlineDays: 2, status: 'Active' },
-            { id: 3, assigneeId: 2, desc: 'Lab Evaluation - Semester 3', difficulty: 3, deadlineDays: 1, status: 'Active' }
-        ],
+        facultyTasks: [],
         // Tasks assigned BY the faculty TO students
         studentTasks: [
             { id: 101, classId: 2, desc: 'Complete OS assignment chapter 1', deadline: '2026-07-20' },
