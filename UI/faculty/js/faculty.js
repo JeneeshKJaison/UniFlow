@@ -1,13 +1,31 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- Mock Data Store ---
-    // Simulating logged-in Faculty Context
-    const currentFaculty = { id: 2, customId: 'FAC002', name: 'Grace Hopper', email: 'faculty@uniflow.edu', deptId: 1, deptName: 'Computer Science' };
+    // --- Mock Data Store & Dynamic Logged-in Faculty Context ---
+    let currentFaculty = { id: 2, customId: 'FAC001', name: 'Grace Hopper', email: 'faculty@uniflow.edu', deptId: 1, deptName: 'Computer Science' };
+    const storedUser = localStorage.getItem('uniflow_currentUser');
+    if (storedUser) {
+        try {
+            const parsed = JSON.parse(storedUser);
+            if (parsed && parsed.role === 'faculty') {
+                currentFaculty = {
+                    id: parsed.id || 2,
+                    customId: parsed.customId || 'FAC',
+                    name: parsed.name || 'Faculty Member',
+                    email: parsed.email || 'faculty@uniflow.edu',
+                    deptId: parsed.deptId || 1,
+                    deptName: parsed.deptName || 'Computer Science'
+                };
+            }
+        } catch(e) {
+            console.error(e);
+        }
+    }
     
     // Set UI labels
-    document.getElementById('facultyNameDisplay').textContent = currentFaculty.name;
-    document.getElementById('deptTitle').textContent = `${currentFaculty.deptName} Department`;
-    document.getElementById('profileName').value = currentFaculty.name;
+    if (document.getElementById('facultyNameDisplay')) document.getElementById('facultyNameDisplay').textContent = currentFaculty.name;
+    if (document.getElementById('deptTitle')) document.getElementById('deptTitle').textContent = `${currentFaculty.deptName} Department`;
+    if (document.getElementById('profileName')) document.getElementById('profileName').value = currentFaculty.name;
+
 
     const dataStore = {
         users: [
@@ -34,10 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'Thu-4': { subjectId: 1, facultyIds: [2] }
         },
         // Tasks assigned BY the HOD TO the faculty
-        facultyTasks: [
-            { id: 1, assigneeId: 2, desc: 'Prepare Midterm Paper for OS', difficulty: 7, deadlineDays: 2, status: 'Active' },
-            { id: 3, assigneeId: 2, desc: 'Lab Evaluation - Semester 3', difficulty: 3, deadlineDays: 1, status: 'Active' }
-        ],
+        facultyTasks: [],
         // Tasks assigned BY the faculty TO students
         studentTasks: [
             { id: 101, classId: 2, desc: 'Complete OS assignment chapter 1', deadline: '2026-07-20' },

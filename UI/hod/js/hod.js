@@ -1,13 +1,30 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- Mock Data Store ---
-    // Simulating logged-in HOD Context
-    const currentHod = { id: 1, name: 'Dr. Alan Turing', email: 'hod@uniflow.edu', deptId: 1, deptName: 'Computer Science' };
+    // --- Mock Data Store & Logged-in HOD Context ---
+    let currentHod = { id: 1, name: 'Dr. Alan Turing', email: 'hod.cs@uniflow.edu', deptId: 1, deptName: 'Computer Science' };
+    const storedUser = localStorage.getItem('uniflow_currentUser');
+    if (storedUser) {
+        try {
+            const parsed = JSON.parse(storedUser);
+            if (parsed && (parsed.role === 'hod' || parsed.isHOD)) {
+                currentHod = {
+                    id: parsed.id || 1,
+                    name: parsed.name || 'HOD',
+                    email: parsed.email || 'hod@uniflow.edu',
+                    deptId: parsed.deptId || 1,
+                    deptName: parsed.deptName || 'Department'
+                };
+            }
+        } catch(e) {
+            console.error(e);
+        }
+    }
     
     // Set UI labels
-    document.getElementById('hodNameDisplay').textContent = currentHod.name;
-    document.getElementById('deptTitle').textContent = `${currentHod.deptName} Console`;
-    document.getElementById('profileName').value = currentHod.name;
+    if (document.getElementById('hodNameDisplay')) document.getElementById('hodNameDisplay').textContent = currentHod.name;
+    if (document.getElementById('deptTitle')) document.getElementById('deptTitle').textContent = `${currentHod.deptName} Console`;
+    if (document.getElementById('profileName')) document.getElementById('profileName').value = `${currentHod.name} (${currentHod.email})`;
+
 
     const dataStore = {
         users: [
@@ -19,11 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: 6, customId: 'FAC004', name: 'Nikola Tesla', role: 'faculty', deptId: 2, isHOD: true, deptName: 'Electrical Eng.' },
             { id: 7, customId: 'FAC005', name: 'Marie Curie', role: 'faculty', deptId: 3, isHOD: true, deptName: 'Physics' }
         ],
-        tasks: [
-            { id: 1, assigneeId: 2, desc: 'Prepare Midterm Paper', difficulty: 7, deadlineDays: 2, status: 'Active' },
-            { id: 2, assigneeId: 3, desc: 'Grade Assignments', difficulty: 4, deadlineDays: 5, status: 'Active' },
-            { id: 3, assigneeId: 2, desc: 'Lab Evaluation', difficulty: 3, deadlineDays: 1, status: 'Active' }
-        ],
+        tasks: [],
         grievances: [
             { id: 1, fromId: 2, subject: 'Projector broken in Lab 3', details: 'The overhead projector in Lab 3 is completely unresponsive. Need it fixed for tomorrow.', date: '2026-07-09', status: 'Pending' },
             { id: 2, fromId: 3, subject: 'Schedule Clash', details: 'My DBMS lecture is clashing with the final year seminar.', date: '2026-07-08', status: 'Resolved' }
@@ -87,11 +100,16 @@ document.addEventListener('DOMContentLoaded', () => {
             navItems.forEach(nav => nav.classList.remove('active'));
             contentSections.forEach(sec => sec.classList.remove('active'));
             item.classList.add('active');
-            document.getElementById(item.getAttribute('data-target')).classList.add('active');
+            const targetId = item.getAttribute('data-target');
+            document.getElementById(targetId).classList.add('active');
             
             // Re-render specific sections when navigated
-            if(item.getAttribute('data-target') === 'chat') {
+            if(targetId === 'chat') {
                 scrollToChatBottom();
+            } else if(targetId === 'tasks') {
+                renderTasks();
+            } else if(targetId === 'overview') {
+                renderOverview();
             }
         });
     });
@@ -253,63 +271,103 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- 1. Overview & Workload ---
-    function renderOverview() {
-        const faculty = getFacultyInDept();
+    async function renderOverview() {
+        const token = localStorage.getItem('uniflow_token') || localStorage.getItem('token');
+        let faculty = getFacultyInDept().filter(f => !f.isHOD);
         const students = getStudentsInDept();
-        const activeTasks = dataStore.tasks.filter(t => t.status === 'Active');
+        let activeTasks = dataStore.tasks.filter(t => t.status === 'Active');
+
+        // Fetch live faculty and tasks from backend if connected
+        if (token) {
+            try {
+                const facRes = await fetch('http://localhost:5000/api/workload/faculty', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (facRes.ok) {
+                    const facData = await facRes.json();
+                    if (facData.success && facData.faculty) {
+                        faculty = facData.faculty;
+                    }
+                }
+
+                const taskRes = await fetch('http://localhost:5000/api/workload/tasks', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (taskRes.ok) {
+                    const taskData = await taskRes.json();
+                    if (taskData.success && taskData.tasks) {
+                        activeTasks = taskData.tasks;
+                    }
+                }
+            } catch (e) {
+                console.warn('Overview backend load note:', e);
+            }
+        }
 
         document.getElementById('stat-faculty').textContent = faculty.length;
         document.getElementById('stat-students').textContent = students.length;
         document.getElementById('stat-tasks').textContent = activeTasks.length;
 
-        // Calculate Workload (Max arbitrary workload assumed to be 20 points per faculty)
-        const maxWorkload = 20;
+        // Workload Threshold is 15 points
+        const threshold = 15;
         const workloadContainer = document.getElementById('workloadContainer');
         workloadContainer.innerHTML = '';
         
         faculty.forEach(fac => {
-            // HOD doesn't usually track their own workload here, but we'll include all faculty.
-            const facTasks = activeTasks.filter(t => t.assigneeId === fac.id);
-            const totalDiff = facTasks.reduce((sum, t) => sum + t.difficulty, 0);
-            const percentage = Math.min((totalDiff / maxWorkload) * 100, 100);
+            let totalDiff = fac.total_active_workload;
+            if (totalDiff === undefined) {
+                const facTasks = activeTasks.filter(t => (t.assigned_to || t.assigneeId) === fac.id);
+                totalDiff = facTasks.reduce((sum, t) => sum + (t.difficulty || 0), 0);
+            } else {
+                totalDiff = parseInt(totalDiff) || 0;
+            }
+
+            const percentage = Math.min((totalDiff / threshold) * 100, 100);
             
             let barClass = '';
-            if (percentage > 75) barClass = 'high';
-            else if (percentage > 40) barClass = 'medium';
+            if (percentage >= 100) barClass = 'high';
+            else if (percentage > 50) barClass = 'medium';
 
             workloadContainer.innerHTML += `
                 <div class="workload-item">
                     <div class="workload-header">
-                        <span>${fac.name}</span>
-                        <span>${totalDiff} pts (${Math.round(percentage)}%)</span>
+                        <span><strong>${fac.name}</strong> <small style="color:var(--text-light);">(${fac.email || fac.custom_id || 'Faculty'})</small></span>
+                        <span style="font-weight: 600; color: ${percentage >= 100 ? '#e53e3e' : 'var(--text-color)'};">${totalDiff} / ${threshold} pts (${Math.round(percentage)}%)</span>
                     </div>
                     <div class="workload-bar-container">
-                        <div class="workload-bar ${barClass}" style="width: ${percentage}%"></div>
+                        <div class="workload-bar ${barClass}" style="width: ${percentage}%;"></div>
                     </div>
                 </div>
             `;
         });
 
-        // Urgent tasks
+        // Urgent tasks list
         const urgentTasksList = document.getElementById('urgentTasksList');
-        urgentTasksList.innerHTML = '';
-        const urgentTasks = [...activeTasks].sort((a, b) => a.deadlineDays - b.deadlineDays).slice(0, 5); // top 5
-        
-        if (urgentTasks.length === 0) {
-            urgentTasksList.innerHTML = '<tr><td colspan="5">No active tasks.</td></tr>';
-        } else {
-            urgentTasks.forEach(t => {
-                const rowColor = t.deadlineDays <= 2 ? 'color: #e53e3e; font-weight:bold;' : '';
-                urgentTasksList.innerHTML += `
-                    <tr style="${rowColor}">
-                        <td>${t.desc}</td>
-                        <td>${getUserName(t.assigneeId)}</td>
-                        <td>${t.difficulty}/10</td>
-                        <td>In ${t.deadlineDays} days</td>
-                        <td>${t.status}</td>
-                    </tr>
-                `;
-            });
+        if (urgentTasksList) {
+            urgentTasksList.innerHTML = '';
+            const urgentTasks = [...activeTasks].slice(0, 5);
+            
+            if (urgentTasks.length === 0) {
+                urgentTasksList.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-light); padding: 16px;">No active tasks.</td></tr>';
+            } else {
+                urgentTasks.forEach(t => {
+                    const desc = t.description || t.desc;
+                    const assignee = t.assignee_name || getUserName(t.assigned_to || t.assigneeId);
+                    const diff = t.difficulty || 5;
+                    const days = t.deadline ? `Due: ${new Date(t.deadline).toLocaleDateString()}` : (t.deadlineDays ? `In ${t.deadlineDays} days` : 'Active');
+                    const status = t.status || 'Active';
+                    
+                    urgentTasksList.innerHTML += `
+                        <tr>
+                            <td>${desc}</td>
+                            <td>${assignee}</td>
+                            <td>${diff}/10</td>
+                            <td>${days}</td>
+                            <td><span class="status-badge" style="background: rgba(11, 122, 117, 0.15); color: var(--primary-color);">${status}</span></td>
+                        </tr>
+                    `;
+                });
+            }
         }
     }
 
@@ -496,61 +554,355 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('timetableSemesterFilter').addEventListener('change', renderTimetable);
 
     // --- 3. Task Assignment ---
-    function renderTasks() {
-        const faculty = getFacultyInDept();
+    async function renderTasks() {
+        const token = localStorage.getItem('uniflow_token') || localStorage.getItem('token');
         const assigneeSelect = document.getElementById('taskAssignee');
+        const subjectSelect = document.getElementById('taskSubject');
+        const tbody = document.getElementById('allTasksList');
+
+        if (!assigneeSelect || !subjectSelect) return;
+
         assigneeSelect.innerHTML = '<option value="">-- Select Faculty --</option>';
-        faculty.forEach(f => {
-            if(!f.isHOD) { // don't assign to self usually
-                assigneeSelect.innerHTML += `<option value="${f.id}">${f.name}</option>`;
+        subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
+
+        let facultyList = getFacultyInDept().filter(f => !f.isHOD);
+        let subjectsList = dataStore.subjects || [];
+        let activeTasksList = dataStore.tasks || [];
+
+        // Fetch dynamic data from backend API
+        if (token) {
+            try {
+                // 1. Fetch faculty from backend
+                const facRes = await fetch('http://localhost:5000/api/workload/faculty', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (facRes.ok) {
+                    const facData = await facRes.json();
+                    if (facData.success && facData.faculty && facData.faculty.length > 0) {
+                        facultyList = facData.faculty;
+                    }
+                }
+
+                // 2. Fetch subjects from backend
+                const subRes = await fetch('http://localhost:5000/api/workload/subjects', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (subRes.ok) {
+                    const subData = await subRes.json();
+                    if (subData.success && subData.subjects && subData.subjects.length > 0) {
+                        subjectsList = subData.subjects;
+                    }
+                }
+
+                // 3. Fetch active tasks from backend
+                const taskRes = await fetch('http://localhost:5000/api/workload/tasks', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (taskRes.ok) {
+                    const taskData = await taskRes.json();
+                    if (taskData.success && taskData.tasks) {
+                        activeTasksList = taskData.tasks;
+                    }
+                }
+            } catch (err) {
+                console.warn('Backend connection note: using available department store data', err);
             }
+        }
+
+        // Populate Faculty dropdown
+        facultyList.forEach(f => {
+            assigneeSelect.innerHTML += `<option value="${f.id}">${f.name} (${f.email || f.custom_id || 'Faculty'})</option>`;
         });
 
-        const tbody = document.getElementById('allTasksList');
-        tbody.innerHTML = '';
-        const tasks = dataStore.tasks.sort((a,b) => a.deadlineDays - b.deadlineDays);
-        tasks.forEach(t => {
-            const attachIcon = t.attachment ? `<span style="color:var(--primary-color);" title="${t.attachment}">📎 ${t.attachment}</span>` : '<span style="color:var(--text-light);">None</span>';
-            tbody.innerHTML += `
-                <tr>
-                    <td>${t.desc}</td>
-                    <td>${getUserName(t.assigneeId)}</td>
-                    <td>In ${t.deadlineDays} days</td>
-                    <td>${attachIcon}</td>
-                </tr>
-            `;
-        });
+        // Helper function to render subjects in dropdown
+        function updateSubjectDropdown(filterFacultyId = null) {
+            subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
+            subjectsList.forEach(s => {
+                const semInfo = s.semester ? ` - Sem ${s.semester}` : '';
+                const codeInfo = s.code ? ` (${s.code})` : '';
+                let isAllocated = false;
+
+                if (filterFacultyId) {
+                    const facultyObj = facultyList.find(f => f.id === filterFacultyId);
+                    const assignedSubIds = facultyObj?.assigned_subjects?.map(sub => sub.id) || [];
+                    isAllocated = assignedSubIds.includes(s.id) || (s.faculty && s.faculty.some(fac => fac.id === filterFacultyId));
+                }
+
+                const badge = isAllocated ? ' ★ Taught by Selected Faculty' : '';
+                subjectSelect.innerHTML += `<option value="${s.id}">${s.name}${codeInfo}${semInfo}${badge}</option>`;
+            });
+        }
+
+        // Initially render all subjects
+        updateSubjectDropdown();
+
+        // Dynamically highlight/filter subjects when a faculty member is selected
+        assigneeSelect.onchange = () => {
+            const selectedFacultyId = parseInt(assigneeSelect.value);
+            updateSubjectDropdown(selectedFacultyId || null);
+        };
+
+        // Render Active Tasks Table
+        if (tbody) {
+            tbody.innerHTML = '';
+            if (activeTasksList.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-light); padding: 16px;">No active tasks assigned yet.</td></tr>';
+            } else {
+                activeTasksList.forEach(t => {
+                    const assigneeName = t.assignee_name || getUserName(t.assigned_to || t.assigneeId);
+                    const desc = t.description || t.desc;
+                    const daysText = t.deadline ? `Due: ${new Date(t.deadline).toLocaleDateString()}` : (t.deadlineDays ? `In ${t.deadlineDays} days` : 'Active');
+                    const attachIcon = t.attachment ? `<span style="color:var(--primary-color);" title="${t.attachment}">📎 ${t.attachment}</span>` : '<span style="color:var(--text-light);">None</span>';
+                    const subBadge = (t.subject_name || t.subject_code) ? `<br><small style="color: var(--primary-color); font-weight: 500;">${t.subject_name || ''} ${t.subject_code ? `(${t.subject_code})` : ''}</small>` : '';
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${desc}</strong>${subBadge}</td>
+                            <td>${assigneeName}</td>
+                            <td>${daysText}</td>
+                            <td>${attachIcon}</td>
+                        </tr>
+                    `;
+                });
+            }
+        }
     }
 
-    document.getElementById('assignTaskForm').addEventListener('submit', (e) => {
+    document.getElementById('assignTaskForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+
         const assigneeId = parseInt(document.getElementById('taskAssignee').value);
+        const subjectId = parseInt(document.getElementById('taskSubject').value);
         const desc = document.getElementById('taskDesc').value;
         const difficulty = parseInt(document.getElementById('taskDifficulty').value);
-        const attachmentInput = document.getElementById('taskAttachment');
-        const attachment = attachmentInput.files.length > 0 ? attachmentInput.files[0].name : null;
-        
-        const deadlineDateValue = document.getElementById('taskDeadline').value;
-        const deadlineDate = new Date(deadlineDateValue);
-        const today = new Date();
-        const diffTime = Math.abs(deadlineDate - today);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const deadlineDate = document.getElementById('taskDeadline').value;
+        const scheduledDate = document.getElementById('taskScheduledDate').value;
 
-        dataStore.tasks.push({
-            id: dataStore.tasks.length + 1,
-            assigneeId: assigneeId,
-            desc: desc,
-            deadlineDays: diffDays,
-            difficulty: difficulty,
-            status: 'Pending',
-            attachment: attachment
-        });
+        if (!assigneeId || !subjectId) {
+            alert('Please select both a faculty member and a subject.');
+            return;
+        }
 
-        e.target.reset();
-        alert('Task assigned successfully!');
-        renderOverview();
-        renderTasks();
-        renderCalendar();
+        const token = localStorage.getItem('uniflow_token') || localStorage.getItem('token');
+
+        if (!token) {
+            alert('Authentication session not found. Please log in.');
+            window.location.href = '../index.html';
+            return;
+        }
+
+        try {
+            const response = await fetch('http://localhost:5000/api/workload/suggest', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    subject_id: subjectId,
+                    assigned_to: assigneeId,
+                    description: desc,
+                    difficulty: difficulty,
+                    deadline: deadlineDate || null,
+                    scheduled_date: scheduledDate
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                alert(result.message || 'Unable to check workload capacity.');
+                return;
+            }
+
+            // Faculty is available within threshold
+            if (result.can_assign) {
+                const faculty = result.selected_faculty;
+                const confirmAssignment = confirm(
+                    `Faculty workload is acceptable.\n\n` +
+                    `• Current Workload: ${faculty.current_workload} pts\n` +
+                    `• Task Difficulty: +${difficulty} pts\n` +
+                    `• Resulting Workload: ${faculty.resulting_workload} pts\n` +
+                    `• Maximum Limit: ${result.threshold} pts\n\n` +
+                    `Do you want to approve and assign this task?`
+                );
+
+                if (!confirmAssignment) {
+                    alert('Assignment cancelled.');
+                    return;
+                }
+
+                await approveTask(result.task, token);
+            } else {
+                // Faculty workload exceeds threshold - display recommendations
+                showWorkloadSuggestions(result);
+            }
+        } catch (error) {
+            console.error('Workload error:', error);
+            alert('Unable to connect to the workload backend server. Ensure the backend is running on http://localhost:5000.');
+        }
+    });
+
+    // Final Approval Function
+    async function approveTask(task, token) {
+        try {
+            const response = await fetch('http://localhost:5000/api/workload/assign', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(task)
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                alert(result.message || 'Unable to assign task.');
+                return;
+            }
+
+            alert('Task approved and assigned successfully!');
+
+            // Reset form
+            document.getElementById('assignTaskForm').reset();
+
+            // Refresh UI components
+            renderTasks();
+            if (typeof renderOverview === 'function') renderOverview();
+            if (typeof renderCalendar === 'function') renderCalendar();
+
+        } catch (error) {
+            console.error('Approval error:', error);
+            alert('Unable to approve and save the task.');
+        }
+    }
+
+    // Interactive Recommendation Dialog for Overloaded Faculty
+    function showWorkloadSuggestions(result) {
+        const modal = document.getElementById('workloadModal');
+        const summary = document.getElementById('workloadModalSummary');
+        const tasksSec = document.getElementById('workloadModalTasksSection');
+        const altFacultyList = document.getElementById('altFacultyList');
+        const altDatesList = document.getElementById('altDatesList');
+        const altFacultyContainer = document.getElementById('altFacultyContainer');
+        const altDatesContainer = document.getElementById('altDatesContainer');
+
+        if (!modal) {
+            alert(`⚠️ Workload Exceeded!\nFaculty current workload: ${result.current_workload} pts. Adding ${result.selected_faculty?.added_difficulty || result.requested_difficulty} pts reaches ${result.resulting_workload} pts (Limit: ${result.threshold} pts).`);
+            return;
+        }
+
+        const fac = result.selected_faculty || {};
+        const addedDiff = fac.added_difficulty || result.requested_difficulty || 0;
+        const total = fac.resulting_workload || result.resulting_workload || 0;
+
+        summary.innerHTML = `
+            <div style="background: rgba(229, 62, 62, 0.1); border: 1px solid rgba(229, 62, 62, 0.3); border-radius: 8px; padding: 14px;">
+                <p style="margin: 0 0 8px 0; font-size: 1rem; color: var(--text-color);">
+                    <strong>${fac.name || 'Selected Faculty'}</strong> cannot take this assignment on the selected dates.
+                </p>
+                <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.9rem;">
+                    <div>• Current Active Workload: <strong>${fac.current_workload} pts</strong></div>
+                    <div>• Task Difficulty: <strong style="color: #e53e3e;">+${addedDiff} pts</strong></div>
+                    <div>• Resulting Total: <strong style="color: #e53e3e;">${total} pts</strong></div>
+                    <div>• Max Threshold: <strong>${result.threshold} pts</strong></div>
+                </div>
+            </div>
+        `;
+
+        // Render overlapping tasks
+        if (result.overlapping_tasks && result.overlapping_tasks.length > 0) {
+            tasksSec.innerHTML = `
+                <div style="margin-top: 10px;">
+                    <h5 style="margin: 0 0 6px 0; color: var(--text-light);">Conflicting Active Tasks During This Period:</h5>
+                    <ul style="margin: 0; padding-left: 18px; font-size: 0.85rem; color: var(--text-light);">
+                        ${result.overlapping_tasks.map(t => `
+                            <li><strong>${t.description}</strong> (${t.difficulty} pts) — Active from ${t.scheduled_date} to ${t.deadline || t.scheduled_date}</li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+            tasksSec.style.display = 'block';
+        } else {
+            tasksSec.style.display = 'none';
+        }
+
+        // Render alternative faculty
+        const altFacs = result.recommendations?.alternative_faculty || [];
+        if (altFacs.length > 0) {
+            altFacultyContainer.style.display = 'block';
+            altFacultyList.innerHTML = altFacs.map(f => `
+                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 10px 14px; border-radius: 8px;">
+                    <div>
+                        <strong style="color: var(--text-color);">${f.name}</strong>
+                        ${f.teaches_subject ? '<span style="background: rgba(11, 122, 117, 0.2); color: var(--primary-color); font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">Teaches this subject</span>' : ''}
+                        <div style="font-size: 0.8rem; color: var(--text-light); margin-top: 2px;">
+                            Current Workload: ${f.current_workload} pts → Resulting: ${f.resulting_workload} / ${result.threshold} pts
+                        </div>
+                    </div>
+                    <button type="button" class="btn-primary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="applyAlternativeFaculty(${f.id}, '${f.name}')">
+                        Assign to ${f.name}
+                    </button>
+                </div>
+            `).join('');
+        } else {
+            altFacultyContainer.style.display = 'block';
+            altFacultyList.innerHTML = '<p style="color: var(--text-light); font-size: 0.85rem; margin: 0;">No other faculty in this department have capacity for this subject during these dates.</p>';
+        }
+
+        // Render alternative dates
+        const altDates = result.recommendations?.alternative_dates || [];
+        if (altDates.length > 0) {
+            altDatesContainer.style.display = 'block';
+            altDatesList.innerHTML = altDates.map(d => `
+                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); padding: 10px 14px; border-radius: 8px;">
+                    <div>
+                        <strong style="color: var(--text-color);">${d.scheduled_date}</strong> (Due: ${d.deadline})
+                        <div style="font-size: 0.8rem; color: var(--text-light); margin-top: 2px;">
+                            Workload on this window: ${d.existing_workload} pts → Resulting: ${d.resulting_workload} / ${result.threshold} pts
+                        </div>
+                    </div>
+                    <button type="button" class="btn-primary" style="background: #2563eb; padding: 6px 12px; font-size: 0.85rem;" onclick="applyAlternativeDate('${d.scheduled_date}', '${d.deadline}')">
+                        Shift to ${d.scheduled_date}
+                    </button>
+                </div>
+            `).join('');
+        } else {
+            altDatesContainer.style.display = 'block';
+            altDatesList.innerHTML = '<p style="color: var(--text-light); font-size: 0.85rem; margin: 0;">No free dates found within the next 30 days.</p>';
+        }
+
+        modal.classList.add('active');
+    }
+
+    // Modal Action: Apply Alternative Faculty
+    window.applyAlternativeFaculty = function(facultyId, facultyName) {
+        const assigneeSelect = document.getElementById('taskAssignee');
+        if (assigneeSelect) {
+            assigneeSelect.value = facultyId;
+            if (assigneeSelect.onchange) assigneeSelect.onchange();
+        }
+        document.getElementById('workloadModal').classList.remove('active');
+        alert(`Assigned faculty changed to ${facultyName}. Click "Assign Task" to confirm and submit.`);
+    };
+
+    // Modal Action: Apply Alternative Date
+    window.applyAlternativeDate = function(schedDate, deadline) {
+        const schedInput = document.getElementById('taskScheduledDate');
+        const deadInput = document.getElementById('taskDeadline');
+        if (schedInput) schedInput.value = schedDate;
+        if (deadInput) deadInput.value = deadline;
+        document.getElementById('workloadModal').classList.remove('active');
+        alert(`Dates updated to Start: ${schedDate}, Due: ${deadline}. Click "Assign Task" to confirm and submit.`);
+    };
+
+    // Close Modal Listeners
+    document.getElementById('closeWorkloadModal')?.addEventListener('click', () => {
+        document.getElementById('workloadModal').classList.remove('active');
+    });
+    document.getElementById('dismissWorkloadModalBtn')?.addEventListener('click', () => {
+        document.getElementById('workloadModal').classList.remove('active');
     });
 
     // --- 4. Calendar View ---
