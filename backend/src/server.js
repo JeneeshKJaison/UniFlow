@@ -5,6 +5,8 @@ require('dotenv').config();
 const pool = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const workloadRoutes = require("./routes/workloadRoutes");
+const facultyRoutes = require("./routes/facultyRoutes");
+const studentRoutes = require("./routes/studentRoutes");
 
 const app = express();
 
@@ -17,6 +19,8 @@ app.use(cors());
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use("/api/workload", workloadRoutes);
+app.use("/api/faculty", facultyRoutes);
+app.use("/api/student", studentRoutes);
 
 
 // ==========================

@@ -60,13 +60,13 @@
                     <h3>Weekly Workload</h3>
                     <div style="margin-top: 16px;">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                            <span style="font-weight: 500; font-size: 0.9rem; color: var(--text-dark);">75% High Workload</span>
-                            <span style="font-weight: 500; font-size: 0.9rem; color: var(--text-dark);">30 hrs / 40 hrs</span>
+                            <span id="weeklyWorkloadStatus" style="font-weight: 500; font-size: 0.9rem; color: var(--text-dark);">0% Workload</span>
+                            <span id="weeklyWorkloadPoints" style="font-weight: 500; font-size: 0.9rem; color: var(--text-dark);">0 pts / 20 pts</span>
                         </div>
                         <div style="width: 100%; background: rgba(255, 255, 255, 0.4); border-radius: 10px; height: 12px; overflow: hidden; border: 1px solid var(--glass-border);">
-                            <div style="width: 75%; height: 100%; background: linear-gradient(90deg, #f39c12, #e74c3c); border-radius: 10px;"></div>
+                            <div id="weeklyWorkloadBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #48bb78, #38a169); border-radius: 10px; transition: width 0.4s ease;"></div>
                         </div>
-                        <p style="font-size: 0.85rem; margin-top: 10px; color: var(--text-light);">You have a busy week ahead with 2 assignments and 1 mid-term test due.</p>
+                        <p id="weeklyWorkloadAdvice" style="font-size: 0.85rem; margin-top: 10px; color: var(--text-light);">Loading workload data...</p>
                     </div>
                 </div>
                 
@@ -170,65 +170,25 @@
                         <div style="margin-top: 16px;">
                             <div class="info-group">
                                 <label>Pending Assignments</label>
-                                <p style="font-size: 1.5rem; font-weight: 700; color: #f39c12;">3</p>
+                                <p id="stat-pending-assignments" style="font-size: 1.5rem; font-weight: 700; color: #f39c12;">0</p>
                             </div>
                             <div class="info-group">
-                                <label>Upcoming Tests</label>
-                                <p style="font-size: 1.5rem; font-weight: 700; color: #e74c3c;">2</p>
+                                <label>Active Workload Score</label>
+                                <p id="stat-workload-points" style="font-size: 1.5rem; font-weight: 700; color: #4299e1;">0 pts</p>
                             </div>
                             <div class="info-group">
-                                <label>Completed Tasks (This Week)</label>
-                                <p style="font-size: 1.5rem; font-weight: 700; color: #27ae60;">5</p>
+                                <label>Completed Assignments</label>
+                                <p id="stat-completed-assignments" style="font-size: 1.5rem; font-weight: 700; color: #27ae60;">0</p>
                             </div>
                         </div>
                     </div>
 
                     <!-- Mini Calendar UI -->
                     <div class="glass-panel" style="padding: 24px;">
-                        <h3>Calendar</h3>
-                        <div class="calendar-container" style="margin-top: 16px;">
-                            <div class="calendar-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-weight: 600;">
-                                <span style="cursor: pointer; padding: 4px;">&#10094;</span>
-                                <span>August 2026</span>
-                                <span style="cursor: pointer; padding: 4px;">&#10095;</span>
-                            </div>
-                            <div class="calendar-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center;">
-                                <div style="font-weight: 500; font-size: 0.8rem; color: var(--text-light);">Su</div>
-                                <div style="font-weight: 500; font-size: 0.8rem; color: var(--text-light);">Mo</div>
-                                <div style="font-weight: 500; font-size: 0.8rem; color: var(--text-light);">Tu</div>
-                                <div style="font-weight: 500; font-size: 0.8rem; color: var(--text-light);">We</div>
-                                <div style="font-weight: 500; font-size: 0.8rem; color: var(--text-light);">Th</div>
-                                <div style="font-weight: 500; font-size: 0.8rem; color: var(--text-light);">Fr</div>
-                                <div style="font-weight: 500; font-size: 0.8rem; color: var(--text-light);">Sa</div>
-                                
-                                <!-- Mock Dates -->
-                                <div style="padding: 8px; font-size: 0.9rem; color: var(--text-light);">26</div>
-                                <div style="padding: 8px; font-size: 0.9rem; color: var(--text-light);">27</div>
-                                <div style="padding: 8px; font-size: 0.9rem; color: var(--text-light);">28</div>
-                                <div style="padding: 8px; font-size: 0.9rem; color: var(--text-light);">29</div>
-                                <div style="padding: 8px; font-size: 0.9rem; color: var(--text-light);">30</div>
-                                <div style="padding: 8px; font-size: 0.9rem; color: var(--text-light);">31</div>
-                                <div style="padding: 8px; font-size: 0.9rem;">1</div>
-                                
-                                <div style="padding: 8px; font-size: 0.9rem;">2</div>
-                                <div style="padding: 8px; font-size: 0.9rem;">3</div>
-                                <div style="padding: 8px; font-size: 0.9rem; background: var(--primary-color); color: white; border-radius: 50%; cursor: pointer;" title="CS302 - Compiler Design Assignment 2">4</div>
-                                <div style="padding: 8px; font-size: 0.9rem;">5</div>
-                                <div style="padding: 8px; font-size: 0.9rem;">6</div>
-                                <div style="padding: 8px; font-size: 0.9rem;">7</div>
-                                <div style="padding: 8px; font-size: 0.9rem;">8</div>
-                                
-                                <div style="padding: 8px; font-size: 0.9rem;">9</div>
-                                <div style="padding: 8px; font-size: 0.9rem;">10</div>
-                                <div style="padding: 8px; font-size: 0.9rem;">11</div>
-                                <div style="padding: 8px; font-size: 0.9rem; border: 2px solid #e74c3c; border-radius: 50%; cursor: pointer;" title="CS304 - Networks Mid-Term Test">12</div>
-                                <div style="padding: 8px; font-size: 0.9rem;">13</div>
-                                <div style="padding: 8px; font-size: 0.9rem;">14</div>
-                                <div style="padding: 8px; font-size: 0.9rem;">15</div>
-                            </div>
-                            <div style="margin-top: 12px; font-size: 0.8rem; display: flex; gap: 10px; justify-content: center;">
-                                <div style="display: flex; align-items: center;"><span style="display: inline-block; width: 10px; height: 10px; background: var(--primary-color); border-radius: 50%; margin-right: 4px;"></span>Assignment</div>
-                                <div style="display: flex; align-items: center;"><span style="display: inline-block; width: 10px; height: 10px; border: 2px solid #e74c3c; border-radius: 50%; margin-right: 4px;"></span>Test</div>
+                        <h3>Calendar & Assignment Deadlines</h3>
+                        <div id="studentCalendarContainer" style="margin-top: 16px;">
+                            <div id="studentCalendarGrid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center;">
+                                <!-- Populated dynamically by JS -->
                             </div>
                         </div>
                     </div>
@@ -236,28 +196,9 @@
 
                 <!-- Upcoming Works List -->
                 <div class="glass-panel" style="padding: 24px; margin-top: 24px;">
-                    <h3>Upcoming Works</h3>
-                    <div style="margin-top: 16px;">
-                        <div class="announcement-item" style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <div class="announcement-title" style="margin-bottom: 4px;">CS302 - Compiler Design Assignment 2</div>
-                                <p style="font-size: 0.85rem;">Submit PDF report on lexical analyzers.</p>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="font-weight: 600; color: var(--primary-color);">Due: Aug 4, 2026</div>
-                                <span class="status-badge status-pending" style="display: inline-block; margin-top: 4px;">Pending</span>
-                            </div>
-                        </div>
-                        <div class="announcement-item" style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <div class="announcement-title" style="margin-bottom: 4px;">CS304 - Networks Mid-Term Test</div>
-                                <p style="font-size: 0.85rem;">Covering chapters 1-4. Room 402.</p>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="font-weight: 600; color: #e74c3c;">Aug 12, 2026</div>
-                                <span class="status-badge" style="background: rgba(231, 76, 60, 0.2); color: #e74c3c; display: inline-block; margin-top: 4px;">Upcoming Test</span>
-                            </div>
-                        </div>
+                    <h3>Upcoming Course Assignments & Work</h3>
+                    <div id="studentUpcomingWorksList" style="margin-top: 16px; display: flex; flex-direction: column; gap: 12px;">
+                        <!-- Populated dynamically by JS -->
                     </div>
                 </div>
             </section>
