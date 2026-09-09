@@ -16,11 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     deptName: parsed.deptName || 'Computer Science'
                 };
             }
-        } catch(e) {
+        } catch (e) {
             console.error(e);
         }
     }
-    
+
     // Set UI labels
     if (document.getElementById('facultyNameDisplay')) document.getElementById('facultyNameDisplay').textContent = currentFaculty.name;
     if (document.getElementById('deptTitle')) document.getElementById('deptTitle').textContent = `${currentFaculty.deptName} Department`;
@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Returns an array of objects: { subjectId, subject, course, semester, weeklyHours }
     function getMyAssignedClasses() {
         const classMap = {};
-        
+
         for (const slotId in dataStore.timetableData) {
             const slot = dataStore.timetableData[slotId];
             if (slot.facultyIds.includes(currentFaculty.id)) {
@@ -134,47 +134,165 @@ document.addEventListener('DOMContentLoaded', () => {
         return classes;
     }
 
+    const API_URL = 'http://localhost:5000';
+    const authToken = localStorage.getItem('uniflow_token');
+
+    // --- 1. API: Fetch Faculty Assigned Tasks ---
+    async function fetchFacultyTasks() {
+        if (!authToken) return;
+        try {
+            const res = await fetch(`${API_URL}/api/faculty/tasks`, {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
+                }
+            });
+            const data = await res.json();
+            if (data.success && Array.isArray(data.tasks)) {
+                dataStore.facultyTasks = data.tasks;
+                renderOverview();
+                renderCalendar();
+            }
+        } catch (err) {
+            console.error('Failed to fetch faculty tasks from server:', err);
+        }
+    }
+
+    // --- 1b. API: Fetch Faculty Assigned Subjects ---
+    async function fetchFacultySubjects() {
+        if (!authToken) return;
+        try {
+            const res = await fetch(`${API_URL}/api/faculty/subjects`, {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
+                }
+            });
+            const data = await res.json();
+            if (data.success && Array.isArray(data.subjects) && data.subjects.length > 0) {
+                dataStore.subjects = data.subjects;
+            }
+        } catch (err) {
+            console.error('Failed to fetch faculty subjects:', err);
+        }
+    }
+
+    // Helper: Parse date strings safely
+    function parseDate(dateStr) {
+        if (!dateStr) return null;
+        const cleaned = dateStr.split('T')[0];
+        const [y, m, d] = cleaned.split('-').map(Number);
+        if (!y || !m || !d) return new Date(dateStr);
+        return new Date(y, m - 1, d);
+    }
+
     // --- 3. Overview ---
     function renderOverview() {
         const myClasses = getMyAssignedClasses();
         const totalHours = myClasses.reduce((sum, c) => sum + c.weeklyHours, 0);
-        
+
         document.getElementById('statClasses').textContent = myClasses.length;
         document.getElementById('statHours').textContent = totalHours;
-        document.getElementById('statTasks').textContent = dataStore.facultyTasks.filter(t => t.status === 'Active').length;
+
+        const activeTasks = dataStore.facultyTasks.filter(t => !t.status || t.status.toLowerCase() !== 'completed');
+        document.getElementById('statTasks').textContent = activeTasks.length;
 
         const tbody = document.getElementById('facultyTasksList');
-        if(!tbody) return;
+        if (!tbody) return;
         tbody.innerHTML = '';
-        
-        dataStore.facultyTasks.forEach(task => {
-            let diffColor = '#48bb78';
-            if (task.difficulty > 4) diffColor = '#ecc94b';
-            if (task.difficulty > 7) diffColor = '#f56565';
-            
-            const deadlineDate = new Date();
-            deadlineDate.setDate(deadlineDate.getDate() + task.deadlineDays);
-            
-            tbody.innerHTML += `
+
+        if (dataStore.facultyTasks.length === 0) {
+            tbody.innerHTML = `
                 <tr>
-                    <td>${task.desc}</td>
-                    <td><span style="background: ${diffColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">Level ${task.difficulty}</span></td>
-                    <td>${deadlineDate.toLocaleDateString()} (${task.deadlineDays} days)</td>
-                    <td>${task.status}</td>
-                    <td><button class="btn-primary" style="padding: 4px 12px; font-size: 0.9rem;" onclick="completeFacultyTask(${task.id})">Mark Done</button></td>
+                    <td colspan="5" style="text-align: center; color: var(--text-light); padding: 24px;">
+                        No tasks assigned yet by HOD.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        dataStore.facultyTasks.forEach(task => {
+            const diff = parseInt(task.difficulty) || 1;
+            let diffColor = '#48bb78';
+            if (diff > 4) diffColor = '#ecc94b';
+            if (diff > 7) diffColor = '#f56565';
+
+            const isCompleted = task.status && task.status.toLowerCase() === 'completed';
+            const isInProgress = task.status && task.status.toLowerCase() === 'in_progress';
+
+            let statusBadge = `<span style="background: rgba(236, 201, 75, 0.2); color: #ecc94b; border: 1px solid rgba(236, 201, 75, 0.4); padding: 3px 10px; border-radius: 12px; font-size: 0.8rem; text-transform: capitalize;">${task.status || 'Pending'}</span>`;
+            if (isCompleted) {
+                statusBadge = `<span style="background: rgba(72, 187, 120, 0.2); color: #48bb78; border: 1px solid rgba(72, 187, 120, 0.4); padding: 3px 10px; border-radius: 12px; font-size: 0.8rem;">✓ Completed</span>`;
+            } else if (isInProgress) {
+                statusBadge = `<span style="background: rgba(66, 153, 225, 0.2); color: #4299e1; border: 1px solid rgba(66, 153, 225, 0.4); padding: 3px 10px; border-radius: 12px; font-size: 0.8rem;">In Progress</span>`;
+            }
+
+            const targetDate = task.deadline ? parseDate(task.deadline) : (task.scheduled_date ? parseDate(task.scheduled_date) : null);
+            const dateDisplay = targetDate ? targetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Flexible';
+            const subjectLabel = task.subject_name ? `<div style="font-size: 0.8rem; color: var(--text-light); margin-top: 2px;">Subject: ${task.subject_name}</div>` : '';
+            const creatorLabel = task.creator_name ? `<div style="font-size: 0.75rem; color: var(--primary-color);">By ${task.creator_name}</div>` : '';
+
+            let actionButtons = '';
+            if (isCompleted) {
+                actionButtons = `
+                    <button class="btn-primary" style="background: rgba(255,255,255,0.08); border: 1px solid var(--glass-border); padding: 4px 10px; font-size: 0.85rem;" onclick="window.updateFacultyTaskStatus(${task.id}, 'pending')">Reopen</button>
+                `;
+            } else {
+                actionButtons = `
+                    <div style="display: flex; gap: 6px;">
+                        ${!isInProgress ? `<button class="btn-primary" style="background: rgba(66, 153, 225, 0.2); border: 1px solid #4299e1; color: #4299e1; padding: 4px 8px; font-size: 0.85rem;" onclick="window.updateFacultyTaskStatus(${task.id}, 'in_progress')">Start</button>` : ''}
+                        <button class="btn-primary" style="padding: 4px 10px; font-size: 0.85rem;" onclick="window.updateFacultyTaskStatus(${task.id}, 'completed')">Mark Done</button>
+                    </div>
+                `;
+            }
+
+            tbody.innerHTML += `
+                <tr style="${isCompleted ? 'opacity: 0.6;' : ''}">
+                    <td>
+                        <strong>${task.description}</strong>
+                        ${subjectLabel}
+                        ${creatorLabel}
+                    </td>
+                    <td><span style="background: ${diffColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">Level ${diff}</span></td>
+                    <td>${dateDisplay}</td>
+                    <td>${statusBadge}</td>
+                    <td>${actionButtons}</td>
                 </tr>
             `;
         });
     }
 
-    window.completeFacultyTask = function(id) {
-        const task = dataStore.facultyTasks.find(t => t.id === id);
-        if(task) {
-            task.status = 'Completed';
-            renderOverview();
-            alert('Task marked as completed!');
+    // --- Window function to update task status in DB ---
+    window.updateFacultyTaskStatus = async function (id, newStatus) {
+        if (!authToken) {
+            alert('Authentication token missing. Please log in again.');
+            return;
         }
-    }
+
+        try {
+            const res = await fetch(`${API_URL}/api/faculty/tasks/${id}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                await fetchFacultyTasks();
+            } else {
+                alert(data.message || 'Failed to update task status.');
+            }
+        } catch (err) {
+            console.error('Error updating task status:', err);
+            alert('Failed to connect to backend.');
+        }
+    };
+
+    window.completeFacultyTask = function (id) {
+        window.updateFacultyTaskStatus(id, 'completed');
+    };
 
     // --- 4. Calendar ---
     let currentCalDate = new Date();
@@ -182,50 +300,49 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderCalendar() {
         const grid = document.getElementById('calendarBody');
         const monthYearDisplay = document.getElementById('currentMonthYear');
-        if(!grid) return;
-        
+        if (!grid) return;
+
         const year = currentCalDate.getFullYear();
         const month = currentCalDate.getMonth();
-        
+
         const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
         monthYearDisplay.textContent = `${monthNames[month]} ${year}`;
-        
+
         grid.innerHTML = '';
-        
+
         const firstDay = new Date(year, month, 1).getDay();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-        
+
         for (let i = 0; i < firstDay; i++) {
             grid.innerHTML += `<div class="calendar-day empty"></div>`;
         }
-        
+
         const today = new Date();
-        
+
         for (let day = 1; day <= daysInMonth; day++) {
             let classStr = 'calendar-day';
-            
-            // Check for tasks
+
+            // Check for tasks on this date
             const dayTasks = dataStore.facultyTasks.filter(task => {
-                if (task.status === 'Active') {
-                    const d = new Date(); // Start date (assumed today for mock data)
-                    d.setDate(d.getDate() + task.deadlineDays);
-                    return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
-                }
-                return false;
+                const isCompleted = task.status && task.status.toLowerCase() === 'completed';
+                if (isCompleted) return false;
+
+                const tDate = task.scheduled_date ? parseDate(task.scheduled_date) : (task.deadline ? parseDate(task.deadline) : null);
+                if (!tDate) return false;
+                return tDate.getFullYear() === year && tDate.getMonth() === month && tDate.getDate() === day;
             });
 
             if (dayTasks.length > 0) {
                 classStr += ' has-tasks';
-                // Check if any task is urgent (difficulty > 7)
-                if (dayTasks.some(t => t.difficulty > 7)) {
+                if (dayTasks.some(t => parseInt(t.difficulty) > 7)) {
                     classStr += ' urgent';
                 }
             }
-            
+
             if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
                 classStr += ' today';
             }
-            
+
             grid.innerHTML += `
                 <div class="${classStr}" data-day="${day}">
                     <span class="day-number">${day}</span>
@@ -241,8 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showTasksForDate(year, month, parseInt(el.getAttribute('data-day')));
             });
         });
-        
-        // Hide details by default
+
         const detailsContainer = document.getElementById('calendarTaskDetails');
         if (detailsContainer) detailsContainer.style.display = 'none';
     }
@@ -251,37 +367,38 @@ document.addEventListener('DOMContentLoaded', () => {
         const detailsContainer = document.getElementById('calendarTaskDetails');
         const selectedDateTasks = document.getElementById('selectedDateTasks');
         const selectedDateDisplay = document.getElementById('selectedDateDisplay');
-        
+
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         selectedDateDisplay.textContent = `${monthNames[month]} ${day}, ${year}`;
-        
+
         const dayTasks = dataStore.facultyTasks.filter(task => {
-            if (task.status === 'Active') {
-                const d = new Date();
-                d.setDate(d.getDate() + task.deadlineDays);
-                return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
-            }
-            return false;
+            const tDate = task.scheduled_date ? parseDate(task.scheduled_date) : (task.deadline ? parseDate(task.deadline) : null);
+            if (!tDate) return false;
+            return tDate.getFullYear() === year && tDate.getMonth() === month && tDate.getDate() === day;
         });
-        
+
         selectedDateTasks.innerHTML = '';
         if (dayTasks.length === 0) {
-            selectedDateTasks.innerHTML = '<p style="color:var(--text-light);">No tasks due on this date.</p>';
+            selectedDateTasks.innerHTML = '<p style="color:var(--text-light);">No tasks scheduled or due on this date.</p>';
         } else {
             dayTasks.forEach(t => {
+                const isCompleted = t.status && t.status.toLowerCase() === 'completed';
                 selectedDateTasks.innerHTML += `
-                    <div class="task-detail-card" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-left: 4px solid var(--primary-color); padding: 12px 16px; border-radius: 4px;">
-                        <strong style="font-size: 1.1rem; display:block; margin-bottom:4px;">${t.desc}</strong>
-                        <div style="color:var(--text-light); font-size: 0.9rem;">
-                            <span>Assigned by: HOD</span> &bull; 
+                    <div class="task-detail-card" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-left: 4px solid ${isCompleted ? '#48bb78' : 'var(--primary-color)'}; padding: 12px 16px; border-radius: 4px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <strong style="font-size: 1.1rem; margin-bottom:4px;">${t.description}</strong>
+                            <span style="font-size: 0.8rem; padding: 2px 8px; border-radius: 10px; background: rgba(255,255,255,0.1);">${t.status || 'Pending'}</span>
+                        </div>
+                        <div style="color:var(--text-light); font-size: 0.9rem; margin-top: 4px;">
+                            <span>Subject: ${t.subject_name || 'General'}</span> &bull; 
                             <span>Difficulty: ${t.difficulty}/10</span> &bull; 
-                            <span style="color: ${t.deadlineDays <= 2 ? '#e53e3e' : 'var(--text-light)'}">Status: ${t.status}</span>
+                            <span>By: ${t.creator_name || 'HOD'}</span>
                         </div>
                     </div>
                 `;
             });
         }
-        
+
         detailsContainer.style.display = 'block';
     }
 
@@ -299,9 +416,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 5. My Classes ---
     function renderMyClasses() {
         const tbody = document.getElementById('myClassesList');
-        if(!tbody) return;
+        if (!tbody) return;
         tbody.innerHTML = '';
-        
+
         const myClasses = getMyAssignedClasses();
         myClasses.forEach(c => {
             tbody.innerHTML += `
@@ -315,74 +432,279 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- 6. Task Assignment (To Students) ---
-    function renderAssignWork() {
-        const select = document.getElementById('workClassSelect');
-        const tbody = document.getElementById('assignedWorksList');
-        if(!select || !tbody) return;
-        
-        // Populate dropdown
-        select.innerHTML = '<option value="" disabled selected>Select a subject you teach...</option>';
-        const myClasses = getMyAssignedClasses();
-        myClasses.forEach(c => {
-            select.innerHTML += `<option value="${c.subjectId}">${c.subjectName} (${c.course} S${c.semester})</option>`;
-        });
+    let pendingStudentTaskPayload = null;
 
-        // Render previous works
+    async function fetchAssignedStudentWorks() {
+        if (!authToken) return;
+        try {
+            const res = await fetch(`${API_URL}/api/faculty/student-assignments`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            const data = await res.json();
+            if (data.success && Array.isArray(data.assigned_works)) {
+                renderAssignedWorksTable(data.assigned_works);
+            }
+        } catch (err) {
+            console.error('Failed to fetch assigned student works:', err);
+        }
+    }
+
+    function renderAssignedWorksTable(works) {
+        const tbody = document.getElementById('assignedWorksList');
+        if (!tbody) return;
         tbody.innerHTML = '';
-        dataStore.studentTasks.forEach(t => {
-            const sub = dataStore.subjects.find(s => s.id == t.classId);
-            const subName = sub ? sub.name : 'Unknown';
+
+        if (!works || works.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-light); padding: 24px;">
+                        No assignments created for students yet.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        works.forEach(w => {
+            const diff = parseInt(w.difficulty) || 1;
+            let diffColor = '#48bb78';
+            if (diff > 4) diffColor = '#ecc94b';
+            if (diff > 7) diffColor = '#f56565';
+
+            const dDate = w.due_date ? parseDate(w.due_date) : null;
+            const dFormatted = dDate ? dDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'No Date';
+
+            const total = parseInt(w.total_students) || 0;
+            const submitted = parseInt(w.submitted_count) || 0;
+
             tbody.innerHTML += `
                 <tr>
-                    <td>${subName}</td>
-                    <td>${t.desc}</td>
-                    <td>${t.deadline}</td>
+                    <td>
+                        <strong>${w.subject_name} (${w.subject_code})</strong>
+                        <div style="font-size: 0.8rem; color: var(--text-light);">${w.course_code} - Sem ${w.semester}</div>
+                    </td>
+                    <td>
+                        <strong>${w.title}</strong>
+                        <div style="font-size: 0.85rem; color: var(--text-light); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${w.description}</div>
+                    </td>
+                    <td>
+                        <span style="background: ${diffColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">Level ${diff}</span>
+                    </td>
+                    <td>${dFormatted}</td>
+                    <td>
+                        <span style="background: rgba(66, 153, 225, 0.15); color: #4299e1; border: 1px solid rgba(66, 153, 225, 0.3); padding: 3px 8px; border-radius: 10px; font-size: 0.85rem;">
+                            ${submitted} / ${total} Turn-ins
+                        </span>
+                    </td>
                 </tr>
             `;
         });
     }
 
-    document.getElementById('assignWorkForm')?.addEventListener('submit', (e) => {
+    function renderAssignWork() {
+        const select = document.getElementById('workClassSelect');
+        if (!select) return;
+
+        select.innerHTML = '<option value="" disabled selected>Select a subject you teach...</option>';
+        if (dataStore.subjects && dataStore.subjects.length > 0) {
+            dataStore.subjects.forEach(s => {
+                select.innerHTML += `<option value="${s.id}">${s.name} (${s.code} - ${s.course_code || s.course_name} Sem ${s.semester})</option>`;
+            });
+        }
+
+        fetchAssignedStudentWorks();
+    }
+
+    // Direct execute assignment save
+    async function executeSaveStudentAssignment(payload) {
+        if (!authToken) {
+            alert('Authentication session expired. Please log in.');
+            return;
+        }
+
+        const submitBtn = document.getElementById('btnSubmitAssign');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Publishing Assignment...';
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/api/faculty/student-assignments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                alert(`✅ Success: ${data.message}`);
+                document.getElementById('assignWorkForm').reset();
+                closeWorkloadModal();
+                fetchAssignedStudentWorks();
+            } else {
+                alert(`❌ ${data.message || 'Failed to assign work.'}`);
+            }
+        } catch (err) {
+            console.error('Error assigning work to students:', err);
+            alert('Network error while assigning work to students.');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '🚀 Validate Workload & Assign';
+            }
+        }
+    }
+
+    function closeWorkloadModal() {
+        const modal = document.getElementById('studentWorkloadModal');
+        if (modal) modal.style.display = 'none';
+        pendingStudentTaskPayload = null;
+    }
+
+    document.getElementById('btnCancelAssignment')?.addEventListener('click', closeWorkloadModal);
+
+    document.getElementById('btnOverrideAssignment')?.addEventListener('click', () => {
+        if (pendingStudentTaskPayload) {
+            executeSaveStudentAssignment(pendingStudentTaskPayload);
+        }
+    });
+
+    document.getElementById('assignWorkForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const classId = document.getElementById('workClassSelect').value;
-        const desc = document.getElementById('workDesc').value;
+        const subjectId = document.getElementById('workClassSelect').value;
+        const title = document.getElementById('workTitle').value.trim();
+        const desc = document.getElementById('workDesc').value.trim();
+        const difficulty = parseInt(document.getElementById('workDifficulty').value);
         const deadline = document.getElementById('workDeadline').value;
+        const maxMarks = parseInt(document.getElementById('workMaxMarks').value) || 100;
 
-        if (!classId) { alert('Please select a class.'); return; }
+        if (!subjectId || !desc || !deadline) {
+            alert('Please fill in all required assignment details.');
+            return;
+        }
 
-        dataStore.studentTasks.push({
-            id: Date.now(),
-            classId: classId,
-            desc: desc,
-            deadline: deadline
-        });
+        const payload = {
+            subject_id: parseInt(subjectId),
+            title: title,
+            description: desc,
+            difficulty: difficulty,
+            due_date: deadline,
+            max_marks: maxMarks
+        };
 
-        alert('Work assigned to students successfully!');
-        e.target.reset();
-        renderAssignWork();
+        // 1. Run Intelligent Workload & Collision Check
+        try {
+            const checkRes = await fetch(`${API_URL}/api/faculty/student-assignments/check`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({
+                    subject_id: payload.subject_id,
+                    difficulty: payload.difficulty,
+                    due_date: payload.due_date
+                })
+            });
+
+            const checkData = await checkRes.json();
+
+            if (!checkData.success) {
+                alert(checkData.message || 'Workload validation failed.');
+                return;
+            }
+
+            // 2. If NO collision/overload -> Directly create assignment
+            if (checkData.can_assign) {
+                await executeSaveStudentAssignment(payload);
+                return;
+            }
+
+            // 3. If OVERLOAD / COLLISION DETECTED -> Open Smart Recommendation Modal
+            pendingStudentTaskPayload = payload;
+            const modal = document.getElementById('studentWorkloadModal');
+            const notice = document.getElementById('modalClassNotice');
+            const summary = document.getElementById('modalWorkloadSummary');
+            const colliding = document.getElementById('modalCollidingAssignments');
+            const altList = document.getElementById('modalAlternativeDatesList');
+
+            notice.textContent = `${checkData.target_class.course_name} (Sem ${checkData.target_class.semester})`;
+
+            summary.innerHTML = `
+                Target Date: <strong>${payload.due_date}</strong><br>
+                Current Class Workload: <strong>${checkData.workload.current_daily_workload} pts</strong> + Task: <strong>${payload.difficulty} pts</strong> = 
+                <strong style="color:#e53e3e;">${checkData.workload.resulting_daily_workload} pts</strong> (Max Safe Limit: ${checkData.workload.daily_threshold} pts).<br>
+                <em>${checkData.reason || 'High workload concentration on this date.'}</em>
+            `;
+
+            if (checkData.existing_assignments && checkData.existing_assignments.length > 0) {
+                colliding.innerHTML = '<strong>Existing assignments due on this date:</strong><ul style="margin: 4px 0 0 16px;">' +
+                    checkData.existing_assignments.map(a => `<li>${a.subject_code} - ${a.title} (Level ${a.difficulty})</li>`).join('') + '</ul>';
+            } else {
+                colliding.innerHTML = '';
+            }
+
+            altList.innerHTML = '';
+            if (checkData.alternative_dates && checkData.alternative_dates.length > 0) {
+                checkData.alternative_dates.forEach(alt => {
+                    const item = document.createElement('div');
+                    item.className = 'glass-card';
+                    item.style.cssText = 'padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border: 1px solid rgba(72, 187, 120, 0.4); background: rgba(72, 187, 120, 0.08); border-radius: 8px; transition: all 0.2s;';
+                    item.innerHTML = `
+                        <div>
+                            <strong style="color: #48bb78; font-size: 1rem;">📅 ${alt.formatted_date}</strong>
+                            <div style="font-size: 0.85rem; color: var(--text-light); margin-top: 2px;">
+                                Workload: ${alt.current_workload} pts $\\rightarrow$ <strong>${alt.resulting_workload} / ${alt.threshold} pts</strong> (Safe)
+                            </div>
+                        </div>
+                        <button type="button" class="btn-primary" style="padding: 6px 14px; font-size: 0.85rem;">Select & Assign</button>
+                    `;
+                    item.addEventListener('click', () => {
+                        payload.due_date = alt.date;
+                        document.getElementById('workDeadline').value = alt.date;
+                        executeSaveStudentAssignment(payload);
+                    });
+                    altList.appendChild(item);
+                });
+            } else {
+                altList.innerHTML = '<p style="color: var(--text-light);">No safe dates found in the next 14 days. You may choose to override.</p>';
+            }
+
+            modal.style.display = 'flex';
+
+        } catch (err) {
+            console.error('Workload check error:', err);
+            // Fallback: allow saving if check API fails
+            if (confirm('Workload verification server did not respond. Do you want to force assign this work?')) {
+                await executeSaveStudentAssignment(payload);
+            }
+        }
     });
 
     // --- 7. Student Marks ---
     function renderMarksSection() {
         const select = document.getElementById('marksClassSelect');
-        if(!select) return;
-        
+        if (!select) return;
+
         select.innerHTML = '<option value="" disabled selected>Select Class...</option>';
         const myClasses = getMyAssignedClasses();
         myClasses.forEach(c => {
             select.innerHTML += `<option value="${c.subjectId}" data-sem="${c.semester}" data-course="${c.course}">${c.subjectName}</option>`;
         });
-        
+
         document.getElementById('marksTableContainer').style.display = 'none';
     }
 
     document.getElementById('btnLoadStudents')?.addEventListener('click', () => {
         const select = document.getElementById('marksClassSelect');
-        if(!select.value) {
+        if (!select.value) {
             alert('Please select a class first.');
             return;
         }
-        
+
         const option = select.options[select.selectedIndex];
         const semester = option.getAttribute('data-sem');
         const course = option.getAttribute('data-course');
@@ -390,10 +712,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Find students in this sem and course
         const students = dataStore.users.filter(u => u.role === 'student' && u.semester == semester && u.course == course);
-        
+
         const tbody = document.getElementById('marksList');
         tbody.innerHTML = '';
-        
+
         students.forEach(s => {
             // Check if marks exist
             const existing = dataStore.studentMarks.find(m => m.studentId == s.id && m.subjectId == subjectId);
@@ -416,15 +738,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnSaveMarks')?.addEventListener('click', () => {
         const subjectId = document.getElementById('marksClassSelect').value;
         const rows = document.querySelectorAll('#marksList tr');
-        
+
         rows.forEach(row => {
             const sId = row.getAttribute('data-student-id');
             const aScore = row.querySelector('.assign-mark-input').value;
             const eScore = row.querySelector('.exam-mark-input').value;
-            
+
             // Remove old entry
             dataStore.studentMarks = dataStore.studentMarks.filter(m => !(m.studentId == sId && m.subjectId == subjectId));
-            
+
             // Add new if valid
             if (aScore !== '' || eScore !== '') {
                 dataStore.studentMarks.push({
@@ -435,16 +757,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         });
-        
+
         alert('Marks saved successfully!');
     });
 
     // --- 8. Grievances ---
     function renderGrievances() {
         const tbody = document.getElementById('myGrievanceList');
-        if(!tbody) return;
+        if (!tbody) return;
         tbody.innerHTML = '';
-        
+
         dataStore.grievances.forEach(g => {
             let statColor = '#dd6b20'; // Pending
             if (g.status === 'Resolved') statColor = '#48bb78';
@@ -476,7 +798,7 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const sub = document.getElementById('grivSubject').value;
         const det = document.getElementById('grivDetails').value;
-        
+
         dataStore.grievances.push({
             id: Date.now(),
             subject: sub,
@@ -485,16 +807,16 @@ document.addEventListener('DOMContentLoaded', () => {
             status: 'Pending',
             resolution: ''
         });
-        
+
         alert('Grievance submitted successfully!');
         document.getElementById('newGrievanceModal').classList.remove('active');
         renderGrievances();
     });
 
-    window.viewMyGrievance = function(id) {
+    window.viewMyGrievance = function (id) {
         const g = dataStore.grievances.find(x => x.id == id);
-        if(!g) return;
-        
+        if (!g) return;
+
         let resolutionHtml = '';
         if (g.status !== 'Pending') {
             resolutionHtml = `
@@ -512,7 +834,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <p style="padding:12px; background:rgba(0,0,0,0.1); border-radius:8px;">${g.details}</p>
             ${resolutionHtml}
         `;
-        
+
         document.getElementById('viewGrievanceModal').classList.add('active');
     };
 
@@ -525,9 +847,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderChatList() {
         const list = document.getElementById('chatThreadsList');
-        if(!list) return;
+        if (!list) return;
         list.innerHTML = '';
-        
+
         dataStore.chatThreads.forEach(t => {
             const isActive = currentChatThreadId === t.id;
             list.innerHTML += `
@@ -542,16 +864,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    window.openChat = function(id) {
+    window.openChat = function (id) {
         currentChatThreadId = id;
         const t = dataStore.chatThreads.find(x => x.id === id);
-        if(!t) return;
+        if (!t) return;
         t.unread = 0; // mark read
-        
+
         document.getElementById('activeChatName').textContent = t.name + (t.isGroup ? ' (Group)' : '');
         document.getElementById('activeChatAvatar').textContent = t.isGroup ? 'G' : t.name.charAt(0);
         document.getElementById('chatInputArea').style.display = 'flex';
-        
+
         renderMessages();
         renderChatList(); // update active state and unread count
     };
@@ -559,9 +881,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderMessages() {
         const view = document.getElementById('chatMessagesView');
         view.innerHTML = '';
-        
+
         const msgs = dataStore.messages.filter(m => m.threadId === currentChatThreadId);
-        
+
         if (msgs.length === 0) {
             view.innerHTML = '<div style="margin: auto; color: var(--text-light);">No messages yet. Say hello!</div>';
             return;
@@ -570,7 +892,7 @@ document.addEventListener('DOMContentLoaded', () => {
         msgs.forEach(m => {
             const isMine = m.senderId === currentFaculty.id;
             const senderName = isMine ? 'You' : getUserName(m.senderId);
-            
+
             view.innerHTML += `
                 <div class="message ${isMine ? 'sent' : 'received'}">
                     ${!isMine ? `<div style="font-size: 0.75rem; opacity: 0.7; margin-bottom: 4px;">${senderName}</div>` : ''}
@@ -579,7 +901,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
         });
-        
+
         view.scrollTop = view.scrollHeight;
     }
 
@@ -587,10 +909,10 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const input = document.getElementById('chatMessageInput');
         const text = input.value.trim();
-        if(!text || !currentChatThreadId) return;
+        if (!text || !currentChatThreadId) return;
 
         const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        
+
         dataStore.messages.push({
             threadId: currentChatThreadId,
             senderId: currentFaculty.id,
@@ -600,7 +922,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // update thread last msg
         const t = dataStore.chatThreads.find(x => x.id === currentChatThreadId);
-        if(t) t.lastMsg = text;
+        if (t) t.lastMsg = text;
 
         input.value = '';
         renderMessages();
@@ -626,13 +948,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('newChatForm')?.addEventListener('submit', (e) => {
         e.preventDefault();
         const userId = parseInt(document.getElementById('newChatUserSelect').value);
-        if(!userId) return;
-        
+        if (!userId) return;
+
         const user = dataStore.users.find(u => u.id === userId);
-        
+
         // check if thread exists
         let existing = dataStore.chatThreads.find(t => !t.isGroup && t.participants.includes(userId) && t.participants.includes(currentFaculty.id));
-        
+
         if (!existing) {
             existing = {
                 id: Date.now(),
@@ -644,12 +966,15 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             dataStore.chatThreads.push(existing);
         }
-        
+
         document.getElementById('newChatModal').classList.remove('active');
         openChat(existing.id);
     });
 
     // Initial render
     renderOverview();
+    fetchFacultyTasks();
+    fetchFacultySubjects();
 
 });
+

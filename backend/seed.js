@@ -97,6 +97,116 @@ async function seed() {
     try {
         console.log('--- Seeding UniFlow Database ---');
 
+        // 0. Ensure Tables Exist
+        console.log('Creating database tables if not exist...');
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                custom_id VARCHAR(50) UNIQUE,
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                role VARCHAR(50) NOT NULL,
+                is_hod BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS departments (
+                id SERIAL PRIMARY KEY,
+                code VARCHAR(50) UNIQUE NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                hod_user_id INT REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS user_departments (
+                id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                department_id INT NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+                UNIQUE(user_id, department_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS courses (
+                id SERIAL PRIMARY KEY,
+                department_id INT NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+                name VARCHAR(255) NOT NULL,
+                code VARCHAR(50) UNIQUE NOT NULL,
+                total_semesters INT DEFAULT 8,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS subjects (
+                id SERIAL PRIMARY KEY,
+                course_id INT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+                name VARCHAR(255) NOT NULL,
+                code VARCHAR(50) UNIQUE NOT NULL,
+                semester INT NOT NULL,
+                credits INT DEFAULT 3,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS subject_faculty (
+                id SERIAL PRIMARY KEY,
+                subject_id INT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+                faculty_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(subject_id, faculty_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS tasks (
+                id SERIAL PRIMARY KEY,
+                created_by INT REFERENCES users(id) ON DELETE SET NULL,
+                assigned_to INT REFERENCES users(id) ON DELETE CASCADE,
+                subject_id INT REFERENCES subjects(id) ON DELETE SET NULL,
+                description TEXT NOT NULL,
+                difficulty INT NOT NULL CHECK (difficulty BETWEEN 1 AND 10),
+                deadline DATE,
+                scheduled_date DATE,
+                status VARCHAR(50) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS students (
+                id SERIAL PRIMARY KEY,
+                user_id INT UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                course_id INT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+                semester INT NOT NULL DEFAULT 5,
+                section VARCHAR(10) DEFAULT 'A',
+                cgpa NUMERIC(3, 2) DEFAULT 8.40,
+                admission_year INT DEFAULT 2023,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS student_assignments (
+                id SERIAL PRIMARY KEY,
+                faculty_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                subject_id INT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+                course_id INT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+                semester INT NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                description TEXT NOT NULL,
+                difficulty INT NOT NULL CHECK (difficulty BETWEEN 1 AND 10),
+                assigned_date DATE DEFAULT CURRENT_DATE,
+                due_date DATE NOT NULL,
+                max_marks INT DEFAULT 100,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS student_assignment_submissions (
+                id SERIAL PRIMARY KEY,
+                assignment_id INT NOT NULL REFERENCES student_assignments(id) ON DELETE CASCADE,
+                student_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                status VARCHAR(50) DEFAULT 'pending',
+                submission_text TEXT,
+                submission_file VARCHAR(255),
+                marks_obtained INT,
+                remarks TEXT,
+                submitted_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(assignment_id, student_id)
+            );
+        `);
+        console.log('✓ Tables created/verified.');
+
         // 1. Seed Users
         console.log('Seeding Users...');
         for (const user of users) {
@@ -258,7 +368,67 @@ async function seed() {
                 [sf.subjectId, sf.facultyId]
             );
         }
-        console.log(`  ✓ Seeded ${subjectFaculty.length} subject-faculty allocations.`);
+        // 7. Seed Initial Sample Tasks
+        console.log('Seeding Sample Assigned Tasks...');
+        const sampleTasks = [
+            {
+                createdBy: 1, // HOD Dr. Alan Turing
+                assignedTo: 2, // Grace Hopper
+                subjectId: 2, // Operating Systems
+                description: 'Prepare Midterm Question Paper for OS',
+                difficulty: 5,
+                scheduledDate: '2026-09-02',
+                deadline: '2026-09-06',
+                status: 'pending'
+            },
+            {
+                createdBy: 1,
+                assignedTo: 2, // Grace Hopper
+                subjectId: 1, // DSA
+                description: 'Conduct Lab Evaluation for Semester 3',
+                difficulty: 4,
+                scheduledDate: '2026-09-03',
+                deadline: '2026-09-07',
+                status: 'in_progress'
+            }
+        ];
+
+        for (const t of sampleTasks) {
+            await pool.query(
+                `
+                INSERT INTO tasks (created_by, assigned_to, subject_id, description, difficulty, scheduled_date, deadline, status)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                ON CONFLICT DO NOTHING
+                `,
+                [t.createdBy, t.assignedTo, t.subjectId, t.description, t.difficulty, t.scheduledDate, t.deadline, t.status]
+            );
+        }
+        console.log(`  ✓ Seeded ${sampleTasks.length} initial faculty tasks.`);
+
+        // 8. Seed Student Profiles
+        console.log('Seeding Student Profiles...');
+        const studentProfiles = [
+            { userId: 4, courseId: cseCourseId, semester: 5, section: 'A', cgpa: 8.75, year: 2023 }, // Ada Lovelace -> B.Tech CSE Sem 5
+            { userId: 5, courseId: cseCourseId, semester: 5, section: 'A', cgpa: 8.30, year: 2023 }  // Tim Berners-Lee -> B.Tech CSE Sem 5
+        ];
+
+        for (const sp of studentProfiles) {
+            await pool.query(
+                `
+                INSERT INTO students (user_id, course_id, semester, section, cgpa, admission_year)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                ON CONFLICT (user_id)
+                DO UPDATE SET
+                    course_id = EXCLUDED.course_id,
+                    semester = EXCLUDED.semester,
+                    section = EXCLUDED.section,
+                    cgpa = EXCLUDED.cgpa,
+                    admission_year = EXCLUDED.admission_year
+                `,
+                [sp.userId, sp.courseId, sp.semester, sp.section, sp.cgpa, sp.year]
+            );
+        }
+        console.log(`  ✓ Seeded ${studentProfiles.length} student profiles.`);
 
         console.log('\n=========================================');
         console.log('Database successfully seeded with all initial data!');
