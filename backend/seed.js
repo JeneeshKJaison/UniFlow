@@ -390,16 +390,6 @@ async function seed() {
                 scheduledDate: '2026-09-03',
                 deadline: '2026-09-07',
                 status: 'in_progress'
-            },
-            {
-                createdBy: 1,
-                assignedTo: 3, // Linus Torvalds
-                subjectId: 4, // Networks
-                description: 'Curriculum Review & Practical Syllabus Update',
-                difficulty: 6,
-                scheduledDate: '2026-09-04',
-                deadline: '2026-09-08',
-                status: 'pending'
             }
         ];
 
