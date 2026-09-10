@@ -567,11 +567,163 @@ const assignTask = async (req, res) => {
     }
 };
 
+// =====================================================
+// 6. ADD A NEW CLASS (Faculty manually adding assigned class)
+// =====================================================
+
+const addClass = async (req, res) => {
+    try {
+        const { programName, semester, courseType, ltpjCode, role, subjectName, subjectCode } = req.body;
+        const currentUserId = req.user?.userId || req.user?.id;
+
+        if (!currentUserId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        // 1. Find or create the course (Program)
+        let courseResult = await pool.query(
+            `SELECT id FROM courses WHERE name = $1 LIMIT 1`,
+            [programName]
+        );
+
+        let courseId;
+        if (courseResult.rows.length > 0) {
+            courseId = courseResult.rows[0].id;
+        } else {
+            // Determine department_id from current user if possible
+            const deptRes = await pool.query(
+                `SELECT department_id FROM user_departments WHERE user_id = $1 LIMIT 1`,
+                [currentUserId]
+            );
+            const deptId = deptRes.rows.length > 0 ? deptRes.rows[0].department_id : 1; // fallback to 1
+
+            // Create new course with a unique code to prevent unique constraint violations
+            const genericCode = `GEN-${Math.floor(Math.random() * 100000)}`;
+            const newCourseRes = await pool.query(
+                `INSERT INTO courses (department_id, name, code, total_semesters) VALUES ($1, $2, $3, $4) RETURNING id`,
+                [deptId, programName, genericCode, 8] // Default generic code and 8 semesters
+            );
+            courseId = newCourseRes.rows[0].id;
+        }
+
+        // 2. Insert the subject
+        const codeToUse = subjectCode || `SUB-${Math.floor(Math.random() * 10000)}`;
+        const subjectRes = await pool.query(
+            `INSERT INTO subjects (course_id, name, code, semester, credits, course_type, ltpj_code) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+            [courseId, subjectName || 'Custom Subject', codeToUse, semester, 3, courseType, ltpjCode] // default 3 credits
+        );
+        const subjectId = subjectRes.rows[0].id;
+
+        // 3. Link subject to faculty
+        await pool.query(
+            `INSERT INTO subject_faculty (subject_id, faculty_id, role) VALUES ($1, $2, $3)
+             ON CONFLICT DO NOTHING`,
+            [subjectId, currentUserId, role || 'Theory']
+        );
+
+        // 4. Calculate workloads and populate tracking tables
+        const { studentsInLab, studentsInProject, priorExperience, labModification } = req.body;
+        const [l, t, p, j] = (ltpjCode || '0-0-0-0').split('-').map(Number);
+        
+        const theoryHours = l || 0;
+        const tutorialHours = t || 0;
+        const labHours = p || 0;
+        const projectHours = j || 0;
+        const studentsClass = 60; // Keep at 60 for now as requested
+        const studentsLab = parseInt(studentsInLab) || 0;
+        const studentsProject = parseInt(studentsInProject) || 0;
+        
+        // Calculate weighted loads based on exact formulas provided by the user
+        const weightedTheory = theoryHours;
+        const weightedLab = labHours * 0.5;
+        const weightedProject = projectHours * 0.5;
+        const weightedTutorial = tutorialHours * 0.5;
+        const weightedStudentsLab = studentsLab * 0.02;
+        const weightedStudentsProject = studentsProject * 0.05;
+
+        const subtotalWeighted = weightedTheory + weightedLab + weightedProject + weightedTutorial + weightedStudentsLab + weightedStudentsProject;
+        const totalLoad = subtotalWeighted;
+
+        // 5. Calculate Question/Assignment Setting Units
+        let numQuestionPapers = 0;
+        if (ltpjCode === '2-0-0-0' || ltpjCode === '2-0-2-2') numQuestionPapers = 2;
+        else if (ltpjCode === '1-0-2-0') numQuestionPapers = 1;
+        else if (ltpjCode === '3-1-0-0' || ltpjCode === '2-1-2-0') numQuestionPapers = 3;
+
+        const numAssignments = 2;
+        const subtotalSettingUnits = (numQuestionPapers * 1) + (numAssignments * 0.5);
+
+        // 6. Calculate Preparation Adjustment Units
+        let prepTheorySubject = 0, prepTheoryRubrics = 0, prepTheoryCopo = 0;
+        let prepLabExp = 0, prepLabRubrics = 0, prepLabEvalSheets = 0, prepLabCopo = 0;
+        let prepProjRubrics = 0, prepProjEvalSheets = 0, prepProjCopo = 0, prepProjScheduling = 0;
+        let subtotalPrepUnits = 0;
+
+        if (role === 'Theory') {
+            prepTheorySubject = 1; prepTheoryRubrics = 1; prepTheoryCopo = 1;
+            subtotalPrepUnits = (1 * 2) + (1 * 2) + (1 * 2); // 6 units
+        } else if (role === 'Lab') {
+            prepLabExp = 1; prepLabRubrics = 1; prepLabEvalSheets = 1; prepLabCopo = 1;
+            const labModWeight = labModification ? 2 : 0.5; 
+            subtotalPrepUnits = (1 * 2) + (1 * 2) + (1 * 0.5) + (1 * 2) + labModWeight;
+        } else if (role === 'Project') {
+            prepProjRubrics = 1; prepProjEvalSheets = 1; prepProjCopo = 1; prepProjScheduling = 1;
+            subtotalPrepUnits = (1 * 2) + (1 * 0.5) + (1 * 2) + (1 * 0.5); // 5 units
+        }
+
+        const experienceMultiplier = priorExperience ? 0.9 : 1.0;
+
+        await pool.query(
+            `INSERT INTO teaching_loads 
+             (subject_id, faculty_id, students_in_class, theory_hours, lab_hours, project_hours, tutorial_hours, students_in_lab, students_in_project, subtotal_weighted_units, total_load)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+             [subjectId, currentUserId, studentsClass, theoryHours, labHours, projectHours, tutorialHours, studentsLab, studentsProject, subtotalWeighted, totalLoad]
+        );
+
+        await pool.query(
+            `INSERT INTO paper_and_assignment_setting 
+             (subject_id, faculty_id, num_question_papers, num_assignments, num_question_bank, subtotal_setting_units)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+             [subjectId, currentUserId, numQuestionPapers, numAssignments, 0, subtotalSettingUnits]
+        );
+
+        await pool.query(
+            `INSERT INTO preparation_and_course_factors 
+             (subject_id, faculty_id, theory_subject_prep, theory_rubrics_prep, theory_copo_mapping, lab_experiments_prep, lab_rubrics_prep, lab_eval_sheets_prep, lab_copo_mapping, project_rubrics_prep, project_eval_sheets_prep, project_copo_mapping, project_scheduling, extra_additions, total_load)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+             [subjectId, currentUserId, prepTheorySubject, prepTheoryRubrics, prepTheoryCopo, prepLabExp, prepLabRubrics, prepLabEvalSheets, prepLabCopo, prepProjRubrics, prepProjEvalSheets, prepProjCopo, prepProjScheduling, 0, subtotalPrepUnits]
+        );
+
+        const grandTotal = (totalLoad + subtotalSettingUnits + subtotalPrepUnits) * experienceMultiplier;
+
+        await pool.query(
+            `INSERT INTO workload_master 
+             (subject_id, faculty_id, teaching_load_units, question_setting_units, prep_adjustment_units, theory_hours_per_week, experience_multiplier, grand_total_workload_units)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+             [subjectId, currentUserId, totalLoad, subtotalSettingUnits, subtotalPrepUnits, theoryHours, experienceMultiplier, grandTotal]
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: "Class added successfully."
+        });
+
+    } catch (error) {
+        console.error("Add class error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error while adding class."
+        });
+    }
+};
+
 
 module.exports = {
     getSubjects,
     getFaculty,
     getTasks,
     suggestTask,
-    assignTask
+    assignTask,
+    addClass
 };

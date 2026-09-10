@@ -6,7 +6,8 @@ const {
     getFaculty,
     getTasks,
     suggestTask,
-    assignTask
+    assignTask,
+    addClass
 } = require("../controllers/workloadController");
 
 const authenticateToken = require("../middleware/authMiddleware");
@@ -44,6 +45,13 @@ router.post(
     "/assign",
     authenticateToken,
     assignTask
+);
+
+// Add a new class
+router.post(
+    "/classes",
+    authenticateToken,
+    addClass
 );
 
 module.exports = router;

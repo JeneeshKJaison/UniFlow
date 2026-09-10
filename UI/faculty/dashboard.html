@@ -147,8 +147,13 @@
             <!-- 3. My Classes Section -->
             <section id="myClasses" class="content-section">
                 <div class="glass-panel" style="padding: 24px;">
-                    <h3>My Assigned Classes</h3>
-                    <p style="color: var(--text-light); margin-top: 8px;">Subjects assigned to you by the HOD through the timetable.</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h3 style="margin: 0;">My Assigned Classes</h3>
+                            <p style="color: var(--text-light); margin-top: 8px;">Subjects assigned to you by the HOD through the timetable.</p>
+                        </div>
+                        <button id="btnAddClass" class="btn-primary" style="padding: 8px 16px;">+ Add Class</button>
+                    </div>
                     <table style="width: 100%; margin-top: 16px;">
                         <thead>
                             <tr style="text-align: left; border-bottom: 1px solid var(--glass-border);">
@@ -358,6 +363,81 @@
         </div>
     </div>
 
+    <!-- Add Class Modal -->
+    <div class="modal-overlay" id="addClassModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px);">
+        <div class="glass-card" style="width: 100%; max-width: 500px; padding: 24px; position: relative;">
+            <span id="closeAddClassModal" style="position: absolute; top: 16px; right: 16px; font-size: 1.5rem; cursor: pointer; color: var(--text-dark);">&times;</span>
+            <h3>Add New Class</h3>
+            <form id="addClassForm" style="margin-top: 16px; display: flex; flex-direction: column; gap: 12px; max-height: 70vh; overflow-y: auto; padding-right: 8px;">
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Role / In-Charge Type</label>
+                    <select id="acRole" required style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                        <option value="Theory">Theory In-Charge</option>
+                        <option value="Lab">Lab In-Charge</option>
+                        <option value="Project">Project In-Charge</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Program Name</label>
+                    <input type="text" id="acProgram" required placeholder="e.g. B.Tech Computer Science" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                </div>
+
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Subject Name</label>
+                    <input type="text" id="acSubjectName" required placeholder="e.g. Data Structures" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                </div>
+
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Semester</label>
+                    <input type="number" id="acSemester" required min="1" max="10" placeholder="e.g. 3" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                </div>
+
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Course Type</label>
+                    <select id="acCourseType" required style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                        <option value="Theory course without ESE|2-0-0-0">Theory course without ESE [2-0-0-0]</option>
+                        <option value="Theory course embedded with tutorial|3-1-0-0">Theory course embedded with tutorial [3-1-0-0]</option>
+                        <option value="Theory course embedded with tutorial & practical|2-1-2-0">Theory course embedded with tutorial & practical [2-1-2-0]</option>
+                        <option value="Theory course embedded with practical without ESE|1-0-2-0">Theory course embedded with practical without ESE [1-0-2-0]</option>
+                        <option value="Project based course|2-0-2-2">Project based course [2-0-2-2]</option>
+                        <option value="Seminar|0-0-2-0">Seminar [0-0-2-0]</option>
+                        <option value="Mini Project|0-0-6-0">Mini Project [0-0-6-0]</option>
+                        <option value="Final year Project|0-0-12-0">Final year Project [0-0-12-0]</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="labStudentsContainer" style="margin: 0; display: none;">
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Number of students to handle in lab</label>
+                    <input type="number" id="acStudentsLab" value="0" min="0" placeholder="e.g. 30" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                </div>
+
+                <div class="form-group" id="labModContainer" style="margin: 0; display: none;">
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Modifications made to lab (new/revised experiments, rubrics)?</label>
+                    <select id="acLabModification" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="projectStudentsContainer" style="margin: 0; display: none;">
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Number of students to manage for project</label>
+                    <input type="number" id="acStudentsProject" value="0" min="0" placeholder="e.g. 10" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                </div>
+
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Prior experience teaching this subject (>0 semesters)?</label>
+                    <select id="acPriorExperience" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn-primary" style="margin-top: 10px;">Save Class</button>
+            </form>
+        </div>
+    </div>
+
     <script src="js/faculty.js"></script>
     <script>
         // Inline script to handle modal overlay display toggling for faculty dashboard since we removed inline active classes
@@ -371,6 +451,15 @@
         document.getElementById('closeNewChatModal').addEventListener('click', () => hideModal('newChatModal'));
         
         document.getElementById('closeViewGrievanceModal').addEventListener('click', () => hideModal('viewGrievanceModal'));
+
+        const btnAddClass = document.getElementById('btnAddClass');
+        if (btnAddClass) {
+            btnAddClass.addEventListener('click', () => showModal('addClassModal'));
+        }
+        const closeAddClassModal = document.getElementById('closeAddClassModal');
+        if (closeAddClassModal) {
+            closeAddClassModal.addEventListener('click', () => hideModal('addClassModal'));
+        }
 
         // Monkey patch faculty.js modal toggling to use display instead of classList
         const originalClassListAdd = DOMTokenList.prototype.add;

@@ -314,6 +314,81 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    document.getElementById('acRole')?.addEventListener('change', (e) => {
+        const role = e.target.value;
+        const labContainer = document.getElementById('labStudentsContainer');
+        const projContainer = document.getElementById('projectStudentsContainer');
+        const labModContainer = document.getElementById('labModContainer');
+        
+        if (labContainer) labContainer.style.display = (role === 'Lab') ? 'block' : 'none';
+        if (labModContainer) labModContainer.style.display = (role === 'Lab') ? 'block' : 'none';
+        if (projContainer) projContainer.style.display = (role === 'Project') ? 'block' : 'none';
+    });
+
+    document.getElementById('addClassForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const role = document.getElementById('acRole').value;
+        const programName = document.getElementById('acProgram').value;
+        const subjectName = document.getElementById('acSubjectName').value;
+        const semester = document.getElementById('acSemester').value;
+        const studentsInLab = document.getElementById('acStudentsLab').value;
+        const studentsInProject = document.getElementById('acStudentsProject').value;
+        const priorExperience = document.getElementById('acPriorExperience').value === 'Yes';
+        const labModification = document.getElementById('acLabModification').value === 'Yes';
+        
+        const courseTypeValue = document.getElementById('acCourseType').value;
+        const [courseType, ltpjCode] = courseTypeValue.split('|');
+
+        try {
+            const token = localStorage.getItem('uniflow_token');
+            const response = await fetch('http://localhost:5000/api/workload/classes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({
+                    programName,
+                    subjectName,
+                    semester: parseInt(semester),
+                    courseType,
+                    ltpjCode,
+                    role,
+                    studentsInLab: parseInt(studentsInLab) || 0,
+                    studentsInProject: parseInt(studentsInProject) || 0,
+                    priorExperience,
+                    labModification
+                })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                alert('Class added successfully!');
+                
+                // Also add to mock store for immediate UI update since faculty.js uses dataStore
+                dataStore.subjects.push({
+                    id: Date.now(),
+                    name: subjectName,
+                    code: 'NEW',
+                    semester: semester,
+                    course: programName
+                });
+                // Mock adding to timetable so it shows up in getMyAssignedClasses
+                dataStore.timetableData['Temp-' + Date.now()] = { subjectId: dataStore.subjects[dataStore.subjects.length - 1].id, facultyIds: [currentFaculty.id] };
+
+                document.getElementById('addClassModal').style.display = 'none';
+                e.target.reset();
+                renderMyClasses();
+            } else {
+                alert('Failed to add class: ' + (data.message || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error adding class:', error);
+            alert('An error occurred. Make sure the backend server is running.');
+        }
+    });
+
     // --- 6. Task Assignment (To Students) ---
     function renderAssignWork() {
         const select = document.getElementById('workClassSelect');
