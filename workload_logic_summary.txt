@@ -1,0 +1,101 @@
+================================================================
+UNIFLOW FACULTY WORKLOAD CALCULATION LOGIC (CURRENT SYSTEM)
+================================================================
+
+1. TRIGGER / INPUTS
+----------------------------------------------------------------
+This entire calculation runs automatically when a faculty member 
+submits the "Add Class" form in their dashboard.
+
+The inputs taken from the form are:
+- Role / In-Charge Type (Theory, Lab, Project)
+- Course Type & L-T-P-J code (e.g. 3-1-0-0)
+- Number of students in class (Defaults to 60)
+- Number of students in lab (Defaults to 0)
+- Number of students in project (Defaults to 0)
+- Prior Experience teaching subject (Yes / No)
+- Lab Modifications made (Yes / No) - Only for Lab Role
+
+
+2. TABLE 1: TEACHING LOADS (teaching_loads)
+----------------------------------------------------------------
+The L, T, P, J hours are extracted from the course code.
+Calculations and Weights:
+- Theory Load: Theory hours * 1.0
+- Lab Load: Lab hours * 0.5
+- Project Load: Project hours * 0.5
+- Tutorial Load: Tutorial hours * 0.5
+- Lab Supervision Load: Students in Lab * 0.02
+- Project Mentoring Load: Students in Project * 0.05
+- Large Class Adjustment: +1.0 (Flat addition if Students in Class > 80)
+
+Subtotal = Sum of all above calculated loads.
+
+
+3. TABLE 2: QUESTION & ASSIGNMENT SETTING (paper_and_assignment_setting)
+----------------------------------------------------------------
+The number of papers and assignments depends on the L-T-P-J code.
+
+Question Papers (Weight = 1.0 per paper):
+- 2-0-0-0 or 2-0-2-2 -> 2 papers
+- 1-0-2-0 -> 1 paper
+- 3-1-0-0 or 2-1-2-0 -> 3 papers
+- Anything else -> 0 papers
+
+Assignments (Weight = 0.5 per assignment):
+- 3-1-0-0, 2-1-2-0, 2-0-2-2 -> 4 assignments
+- All other courses -> 2 assignments
+
+Subtotal = (Question Papers * 1.0) + (Assignments * 0.5)
+
+
+4. TABLE 3: PREPARATION ADJUSTMENT UNITS (preparation_and_course_factors)
+----------------------------------------------------------------
+Automatically assigned based on the selected Role.
+
+If Role == 'Theory':
+- Subject Prep (Weight: 2.0)
+- Rubrics Prep (Weight: 2.0)
+- CO-PO Mapping (Weight: 2.0)
+- Subtotal = 6.0
+
+If Role == 'Lab':
+- Experiments Prep (Weight: 2.0)
+- Rubrics Prep (Weight: 2.0)
+- Eval Sheets Prep (Weight: 0.5)
+- CO-PO Mapping (Weight: 2.0)
+- Lab In-charge Modification: If Yes = 2.0, If No = 0.5
+- Subtotal = 8.5 (if modified) or 7.0 (if routine)
+
+If Role == 'Project':
+- Rubrics Prep (Weight: 2.0)
+- Eval Sheets Prep (Weight: 0.5)
+- CO-PO Mapping (Weight: 2.0)
+- Scheduling (Weight: 0.5)
+- Subtotal = 5.0
+
+
+5. TABLE 4: EVALUATION UNITS (evaluation_units)
+----------------------------------------------------------------
+Calculated based on the number of students.
+
+- Series Exams: 2 exams * Students in Class. (Weight: 0.05 per script)
+- End Sem Exams: 1 exam * Students in Class. (Weight: 0.08 per script)
+  *NOTE: Drops to 0 scripts if course name says "without ESE", "project", or "seminar".
+- Assignments: Total Assignments * Students in Class. (Weight: 0.02 per script)
+- Lab Outputs: 10 outputs * Students in Lab. (Weight: 0.05 per output)
+- Practical Exams: 1 exam * Students in Lab. (Weight: 0.1 per student)
+- Viva-voce: 1 * Students in Project. (Weight: 0.15 per student)
+- Project Evals: 1 * Students in Project. (Weight: 0.15 per student)
+
+Subtotal = Sum of all weighted scripts above.
+
+
+6. MASTER TABLE: GRAND TOTAL (workload_master)
+----------------------------------------------------------------
+Experience Multiplier:
+- If Prior Experience == 'Yes' -> Multiplier is 0.9
+- If Prior Experience == 'No'  -> Multiplier is 1.0
+
+Grand Total Workload Units = 
+(Teaching Load Subtotal + Setting Subtotal + Prep Subtotal + Evaluation Subtotal) * Experience Multiplier

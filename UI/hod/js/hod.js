@@ -1438,7 +1438,168 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- HOD Workload Overview & Chart Logic ---
+    let hodSummaryData = null;
+    let workloadChartInstance = null;
+
+    async function fetchAndRenderHodSummary() {
+        try {
+            const token = localStorage.getItem('uniflow_token');
+            if (!token) return;
+
+            const res = await fetch('http://localhost:5000/api/workload/hod/summary', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            const data = await res.json();
+            if (!data.success) return;
+
+            hodSummaryData = data;
+            renderWorkloadChart('grand_total_workload_units', 'Total Academic Workload');
+
+        } catch (error) {
+            console.error('Error fetching HOD workload summary:', error);
+        }
+    }
+
+    function renderWorkloadChart(metricField, title) {
+        if (!hodSummaryData || !hodSummaryData.workload_master) return;
+
+        // Group by faculty
+        const facultyTotals = {};
+        hodSummaryData.workload_master.forEach(row => {
+            const name = row.faculty_name || 'Unknown';
+            if (!facultyTotals[name]) facultyTotals[name] = 0;
+            facultyTotals[name] += parseFloat(row[metricField] || 0);
+        });
+
+        const labels = Object.keys(facultyTotals);
+        const values = Object.values(facultyTotals).map(v => v.toFixed(2));
+
+        const ctx = document.getElementById('workloadChart');
+        if (!ctx) return;
+
+        if (labels.length === 0) {
+            ctx.parentNode.innerHTML = '<div style="color: #ffcccc; padding: 30px; text-align: center; font-size: 1.2rem;">⚠️ No data found in the database.<br>Please run the simulation script completely.</div>';
+            return;
+        }
+
+        if (workloadChartInstance) {
+            workloadChartInstance.destroy();
+        }
+
+        workloadChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: title,
+                    data: values,
+                    backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                    borderColor: 'rgba(99, 102, 241, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#fff' } }
+                },
+                scales: {
+                    y: { beginAtZero: true, ticks: { color: '#fff' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                    x: { ticks: { color: '#fff' }, grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // Toggle to Sub-Links menu
+    const linkAcademic = document.getElementById('linkAcademic');
+    if (linkAcademic) {
+        linkAcademic.addEventListener('click', () => {
+            document.getElementById('workloadQuickLinks').style.display = 'none';
+            document.getElementById('academicSubLinks').style.display = 'flex';
+        });
+    }
+
+    const backToMainLinks = document.getElementById('backToMainLinks');
+    if (backToMainLinks) {
+        backToMainLinks.addEventListener('click', () => {
+            document.getElementById('academicSubLinks').style.display = 'none';
+            document.getElementById('workloadQuickLinks').style.display = 'flex';
+            document.getElementById('workloadSubTableContainer').style.display = 'none';
+            
+            // Revert chart to Grand Total
+            renderWorkloadChart('grand_total_workload_units', 'Total Academic Workload');
+        });
+    }
+
+    // Expose showSubTable to global scope for inline onclick handler
+    window.showSubTable = function(tableName) {
+        if (!hodSummaryData || !hodSummaryData[tableName]) return;
+
+        // Update the Chart to show the selected metric
+        const tableToMetricMap = {
+            'teaching_loads': { field: 'teaching_load_units', title: 'Teaching Load Units' },
+            'paper_and_assignment_setting': { field: 'question_setting_units', title: 'Question/Assignment Setting Units' },
+            'preparation_and_course_factors': { field: 'prep_adjustment_units', title: 'Preparation Adjustment Units' },
+            'evaluation_units': { field: 'evaluation_units', title: 'Evaluation Units' },
+            'theory_hours': { field: 'theory_hours_per_week', title: 'Theory Hours (per week)' },
+            'experience_multiplier': { field: 'experience_multiplier', title: 'Experience Multiplier' }
+        };
+        
+        const mapping = tableToMetricMap[tableName];
+        if (mapping) {
+            renderWorkloadChart(mapping.field, mapping.title);
+        }
+
+        const container = document.getElementById('workloadSubTableContainer');
+        const thead = document.getElementById('subTableHead');
+        const tbody = document.getElementById('subTableBody');
+        const titleEl = document.getElementById('subTableTitle');
+        
+        container.style.display = 'block';
+        thead.innerHTML = '';
+        tbody.innerHTML = '';
+
+        const data = hodSummaryData[tableName];
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td style="padding:12px;">No data available</td></tr>';
+            return;
+        }
+
+        // Generate headers dynamically based on the first row's keys
+        // Filter out unnecessary columns like ids
+        let keys = Object.keys(data[0]).filter(k => k !== 'id' && k !== 'subject_id' && k !== 'faculty_id' && k !== 'created_at');
+        
+        titleEl.textContent = tableName.replace(/_/g, ' ').toUpperCase() + ' DATA';
+
+        let headerHtml = '<tr>';
+        keys.forEach(k => {
+            headerHtml += `<th style="padding:12px; text-align:left; border-bottom: 2px solid var(--primary-color);">${k.replace(/_/g, ' ').toUpperCase()}</th>`;
+        });
+        headerHtml += '</tr>';
+        thead.innerHTML = headerHtml;
+
+        let bodyHtml = '';
+        data.forEach(row => {
+            bodyHtml += '<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">';
+            keys.forEach(k => {
+                let val = row[k];
+                // Format numbers if they have many decimals
+                if (typeof val === 'number' && !Number.isInteger(val)) {
+                    val = val.toFixed(2);
+                }
+                bodyHtml += `<td style="padding:12px;">${val !== null ? val : '-'}</td>`;
+            });
+            bodyHtml += '</tr>';
+        });
+        tbody.innerHTML = bodyHtml;
+    };
+
     // --- Init ---
+    fetchAndRenderHodSummary();
     renderOverview();
     renderSubjects();
     renderTimetable();

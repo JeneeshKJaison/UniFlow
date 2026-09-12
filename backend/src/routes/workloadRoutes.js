@@ -7,7 +7,8 @@ const {
     getTasks,
     suggestTask,
     assignTask,
-    addClass
+    addClass,
+    getHodSummary
 } = require("../controllers/workloadController");
 
 const authenticateToken = require("../middleware/authMiddleware");
@@ -52,6 +53,13 @@ router.post(
     "/classes",
     authenticateToken,
     addClass
+);
+
+// Get HOD summary
+router.get(
+    "/hod/summary",
+    authenticateToken,
+    getHodSummary
 );
 
 module.exports = router;

@@ -449,6 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const programName = document.getElementById('acProgram').value;
         const subjectName = document.getElementById('acSubjectName').value;
         const semester = document.getElementById('acSemester').value;
+        const studentsClass = document.getElementById('acStudentsClass').value;
         const studentsInLab = document.getElementById('acStudentsLab').value;
         const studentsInProject = document.getElementById('acStudentsProject').value;
         const priorExperience = document.getElementById('acPriorExperience').value === 'Yes';
@@ -472,6 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     courseType,
                     ltpjCode,
                     role,
+                    studentsClass: parseInt(studentsClass) || 60,
                     studentsInLab: parseInt(studentsInLab) || 0,
                     studentsInProject: parseInt(studentsInProject) || 0,
                     priorExperience,

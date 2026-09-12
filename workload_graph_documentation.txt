@@ -1,0 +1,57 @@
+================================================================
+UNIFLOW HOD WORKLOAD DASHBOARD & GRAPH - EXPLANATION GUIDE
+================================================================
+
+This document explains how the newly built HOD Workload Dashboard works, 
+so you can easily explain it to your team/friends.
+
+----------------------------------------------------------------
+1. HOW THE GRAPH WORKS (The Frontend)
+----------------------------------------------------------------
+- When the HOD Dashboard loads, it immediately calls a new API endpoint (`/api/workload/hod/summary`).
+- This API gathers all the workload data from the database and sends it to the frontend.
+- The frontend uses a visual graphing library called `Chart.js` to draw a beautiful, animated Bar Graph.
+- By default, this graph shows the "Grand Total Academic Workload" for every teacher in the system.
+
+----------------------------------------------------------------
+2. DYNAMIC INTERACTION (Clicking the Buttons)
+----------------------------------------------------------------
+- Next to the graph is a "Quick Links" menu. 
+- When you click **"Academic Workload Summary"**, it expands to show 6 sub-categories (Teaching Load, Evaluation Units, etc.).
+- When you click one of these sub-categories (e.g., "Evaluation Units"), two things happen instantly:
+   1. The Bar Graph magically re-draws itself to show ONLY the Evaluation Units for all the teachers.
+   2. A detailed, Excel-style Data Table appears directly below the graph, breaking down exactly how those points were earned for every single subject.
+- Clicking "← Back to Categories" resets the graph back to showing the Grand Totals.
+
+----------------------------------------------------------------
+3. HOW THE DATA IS CALCULATED (The Backend)
+----------------------------------------------------------------
+- Every time a teacher uses the "Add Class" form, the backend calculates their workload based on the exact formula we designed (Theory hours, Practical hours, Preparation time, Exams to grade, etc.).
+- It also applies the "Prior Experience" multiplier (0.9 if experienced).
+- The final numbers are saved cleanly into 5 interconnected database tables:
+   1. `workload_master` (Stores the grand totals)
+   2. `teaching_loads`
+   3. `paper_and_assignment_setting`
+   4. `preparation_and_course_factors`
+   5. `evaluation_units`
+
+================================================================
+COMMANDS TO RUN AFTER A GIT PULL
+================================================================
+If your friend downloads/pulls this new code to their computer, their database will be missing the new columns we added. 
+To get their system working perfectly with the new graph, they must open a terminal in the `backend` folder and run these 3 commands in exact order:
+
+1. UPDATE THE DATABASE STRUCTURE:
+   Run: node alter_workload_tables.js
+   (This adds the required `subject_name` and `faculty_name` columns to all the workload tables).
+
+2. WIPE OLD BROKEN DATA:
+   Run: node clear_workload.js
+   (This safely deletes any old workload data that doesn't have the new name columns).
+
+3. GENERATE FRESH TEST DATA FOR THE GRAPH:
+   Run: node simulate_workload.js
+   (This creates mock teachers and automatically assigns them 15 different classes. It fully populates the database so the graph instantly looks amazing!).
+
+4. RESTART THE SERVER:
+   Run: npm start

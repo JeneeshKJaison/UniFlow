@@ -623,14 +623,14 @@ const addClass = async (req, res) => {
         );
 
         // 4. Calculate workloads and populate tracking tables
-        const { studentsInLab, studentsInProject, priorExperience, labModification } = req.body;
+        const { studentsInLab, studentsInProject, priorExperience, labModification, studentsClass: bodyStudentsClass } = req.body;
         const [l, t, p, j] = (ltpjCode || '0-0-0-0').split('-').map(Number);
         
         const theoryHours = l || 0;
         const tutorialHours = t || 0;
         const labHours = p || 0;
         const projectHours = j || 0;
-        const studentsClass = 60; // Keep at 60 for now as requested
+        const studentsClass = bodyStudentsClass || 60; 
         const studentsLab = parseInt(studentsInLab) || 0;
         const studentsProject = parseInt(studentsInProject) || 0;
         
@@ -642,7 +642,10 @@ const addClass = async (req, res) => {
         const weightedStudentsLab = studentsLab * 0.02;
         const weightedStudentsProject = studentsProject * 0.05;
 
-        const subtotalWeighted = weightedTheory + weightedLab + weightedProject + weightedTutorial + weightedStudentsLab + weightedStudentsProject;
+        // Large class adjustment
+        const largeClassAdjustment = studentsClass > 80 ? 1.0 : 0;
+
+        const subtotalWeighted = weightedTheory + weightedLab + weightedProject + weightedTutorial + weightedStudentsLab + weightedStudentsProject + largeClassAdjustment;
         const totalLoad = subtotalWeighted;
 
         // 5. Calculate Question/Assignment Setting Units
@@ -651,7 +654,11 @@ const addClass = async (req, res) => {
         else if (ltpjCode === '1-0-2-0') numQuestionPapers = 1;
         else if (ltpjCode === '3-1-0-0' || ltpjCode === '2-1-2-0') numQuestionPapers = 3;
 
-        const numAssignments = 2;
+        let numAssignments = 2;
+        if (['3-1-0-0', '2-1-2-0', '2-0-2-2'].includes(ltpjCode)) {
+            numAssignments = 4;
+        }
+
         const subtotalSettingUnits = (numQuestionPapers * 1) + (numAssignments * 0.5);
 
         // 6. Calculate Preparation Adjustment Units
@@ -674,34 +681,73 @@ const addClass = async (req, res) => {
 
         const experienceMultiplier = priorExperience ? 0.9 : 1.0;
 
+        // 7. Calculate Evaluation Units
+        const seriesExams = 2; // Assuming 2 series exams per semester
+        let endSemScripts = 0;
+        
+        // If course doesn't have ESE or is purely project/seminar, it has 0 end sem scripts
+        const courseTypeLower = (courseType || '').toLowerCase();
+        if (!courseTypeLower.includes('without ese') && !courseTypeLower.includes('project') && !courseTypeLower.includes('seminar')) {
+            endSemScripts = studentsClass; // 1 ESE script per student
+        }
+
+        const seriesScripts = seriesExams * studentsClass;
+        const assignmentScriptsTotal = numAssignments * studentsClass;
+        const labOutputs = studentsLab * 10; // Assuming 10 weekly lab outputs
+        const practicalExams = studentsLab; 
+        const vivaVoce = studentsProject; 
+        const projectEvals = studentsProject;
+
+        const weightedSeriesScripts = seriesScripts * 0.05;
+        const weightedEndSemScripts = endSemScripts * 0.08;
+        const weightedAssignmentScripts = assignmentScriptsTotal * 0.02;
+        const weightedLabOutputs = labOutputs * 0.05;
+        const weightedPracticalExams = practicalExams * 0.1;
+        const weightedVivaVoce = vivaVoce * 0.15;
+        const weightedProjectEvals = projectEvals * 0.15;
+
+        const subtotalEvalUnits = weightedSeriesScripts + weightedEndSemScripts + weightedAssignmentScripts + weightedLabOutputs + weightedPracticalExams + weightedVivaVoce + weightedProjectEvals;
+
+        // Fetch faculty name for easier viewing in pgAdmin
+        const userRes = await pool.query('SELECT name FROM users WHERE id = $1', [currentUserId]);
+        const facultyName = userRes.rows[0] ? userRes.rows[0].name : 'Unknown Faculty';
+        const finalSubjectName = subjectName || 'Custom Subject';
+
         await pool.query(
             `INSERT INTO teaching_loads 
-             (subject_id, faculty_id, students_in_class, theory_hours, lab_hours, project_hours, tutorial_hours, students_in_lab, students_in_project, subtotal_weighted_units, total_load)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-             [subjectId, currentUserId, studentsClass, theoryHours, labHours, projectHours, tutorialHours, studentsLab, studentsProject, subtotalWeighted, totalLoad]
+             (subject_id, subject_name, faculty_id, faculty_name, students_in_class, theory_hours, lab_hours, project_hours, tutorial_hours, students_in_lab, students_in_project, subtotal_weighted_units, total_load)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+             [subjectId, finalSubjectName, currentUserId, facultyName, studentsClass, theoryHours, labHours, projectHours, tutorialHours, studentsLab, studentsProject, subtotalWeighted, totalLoad]
         );
 
         await pool.query(
             `INSERT INTO paper_and_assignment_setting 
-             (subject_id, faculty_id, num_question_papers, num_assignments, num_question_bank, subtotal_setting_units)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-             [subjectId, currentUserId, numQuestionPapers, numAssignments, 0, subtotalSettingUnits]
+             (subject_id, subject_name, faculty_id, faculty_name, num_question_papers, num_assignments, num_question_bank, subtotal_setting_units)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+             [subjectId, finalSubjectName, currentUserId, facultyName, numQuestionPapers, numAssignments, 0, subtotalSettingUnits]
         );
 
         await pool.query(
             `INSERT INTO preparation_and_course_factors 
-             (subject_id, faculty_id, theory_subject_prep, theory_rubrics_prep, theory_copo_mapping, lab_experiments_prep, lab_rubrics_prep, lab_eval_sheets_prep, lab_copo_mapping, project_rubrics_prep, project_eval_sheets_prep, project_copo_mapping, project_scheduling, extra_additions, total_load)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-             [subjectId, currentUserId, prepTheorySubject, prepTheoryRubrics, prepTheoryCopo, prepLabExp, prepLabRubrics, prepLabEvalSheets, prepLabCopo, prepProjRubrics, prepProjEvalSheets, prepProjCopo, prepProjScheduling, 0, subtotalPrepUnits]
+             (subject_id, subject_name, faculty_id, faculty_name, theory_subject_prep, theory_rubrics_prep, theory_copo_mapping, lab_experiments_prep, lab_rubrics_prep, lab_eval_sheets_prep, lab_copo_mapping, project_rubrics_prep, project_eval_sheets_prep, project_copo_mapping, project_scheduling, extra_additions, total_load)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+             [subjectId, finalSubjectName, currentUserId, facultyName, prepTheorySubject, prepTheoryRubrics, prepTheoryCopo, prepLabExp, prepLabRubrics, prepLabEvalSheets, prepLabCopo, prepProjRubrics, prepProjEvalSheets, prepProjCopo, prepProjScheduling, 0, subtotalPrepUnits]
         );
 
-        const grandTotal = (totalLoad + subtotalSettingUnits + subtotalPrepUnits) * experienceMultiplier;
+        await pool.query(
+            `INSERT INTO evaluation_units 
+             (subject_id, subject_name, faculty_id, faculty_name, series_answer_scripts, end_sem_answer_scripts, assignment_scripts, lab_output_evaluations, practical_exam_evals, viva_voce_count, project_evaluations, subtotal_evaluation_units)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+             [subjectId, finalSubjectName, currentUserId, facultyName, seriesScripts, endSemScripts, assignmentScriptsTotal, labOutputs, practicalExams, vivaVoce, projectEvals, subtotalEvalUnits]
+        );
+
+        const grandTotal = (totalLoad + subtotalSettingUnits + subtotalPrepUnits + subtotalEvalUnits) * experienceMultiplier;
 
         await pool.query(
             `INSERT INTO workload_master 
-             (subject_id, faculty_id, teaching_load_units, question_setting_units, prep_adjustment_units, theory_hours_per_week, experience_multiplier, grand_total_workload_units)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-             [subjectId, currentUserId, totalLoad, subtotalSettingUnits, subtotalPrepUnits, theoryHours, experienceMultiplier, grandTotal]
+             (subject_id, subject_name, faculty_id, faculty_name, teaching_load_units, question_setting_units, prep_adjustment_units, evaluation_units, theory_hours_per_week, experience_multiplier, grand_total_workload_units)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+             [subjectId, finalSubjectName, currentUserId, facultyName, totalLoad, subtotalSettingUnits, subtotalPrepUnits, subtotalEvalUnits, theoryHours, experienceMultiplier, grandTotal]
         );
 
         return res.status(200).json({
@@ -719,11 +765,38 @@ const addClass = async (req, res) => {
 };
 
 
+// =====================================================
+// 7. GET HOD SUMMARY DATA
+// =====================================================
+
+const getHodSummary = async (req, res) => {
+    try {
+        const masterRes = await pool.query('SELECT * FROM workload_master ORDER BY faculty_name, subject_name');
+        const teachingRes = await pool.query('SELECT * FROM teaching_loads ORDER BY faculty_name, subject_name');
+        const paperRes = await pool.query('SELECT * FROM paper_and_assignment_setting ORDER BY faculty_name, subject_name');
+        const prepRes = await pool.query('SELECT * FROM preparation_and_course_factors ORDER BY faculty_name, subject_name');
+        const evalRes = await pool.query('SELECT * FROM evaluation_units ORDER BY faculty_name, subject_name');
+
+        return res.status(200).json({
+            success: true,
+            workload_master: masterRes.rows,
+            teaching_loads: teachingRes.rows,
+            paper_and_assignment_setting: paperRes.rows,
+            preparation_and_course_factors: prepRes.rows,
+            evaluation_units: evalRes.rows
+        });
+    } catch (error) {
+        console.error("Get HOD summary error:", error);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
 module.exports = {
     getSubjects,
     getFaculty,
     getTasks,
     suggestTask,
     assignTask,
-    addClass
+    addClass,
+    getHodSummary
 };
