@@ -572,6 +572,7 @@ const assignTask = async (req, res) => {
 // =====================================================
 
 const addClass = async (req, res) => {
+    const client = await pool.connect();
     try {
         const { programName, semester, courseType, ltpjCode, role, subjectName, subjectCode } = req.body;
         const currentUserId = req.user?.userId || req.user?.id;
@@ -580,9 +581,11 @@ const addClass = async (req, res) => {
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
 
+        await client.query('BEGIN');
+
         // 1. Find or create the course (Program)
-        let courseResult = await pool.query(
-            `SELECT id FROM courses WHERE name = $1 LIMIT 1`,
+        let courseResult = await client.query(
+            `SELECT id FROM courses WHERE name ILIKE $1 LIMIT 1`,
             [programName]
         );
 
@@ -591,15 +594,15 @@ const addClass = async (req, res) => {
             courseId = courseResult.rows[0].id;
         } else {
             // Determine department_id from current user if possible
-            const deptRes = await pool.query(
+            const deptRes = await client.query(
                 `SELECT department_id FROM user_departments WHERE user_id = $1 LIMIT 1`,
                 [currentUserId]
             );
             const deptId = deptRes.rows.length > 0 ? deptRes.rows[0].department_id : 1; // fallback to 1
 
             // Create new course with a unique code to prevent unique constraint violations
-            const genericCode = `GEN-${Math.floor(Math.random() * 100000)}`;
-            const newCourseRes = await pool.query(
+            const genericCode = `GEN-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+            const newCourseRes = await client.query(
                 `INSERT INTO courses (department_id, name, code, total_semesters) VALUES ($1, $2, $3, $4) RETURNING id`,
                 [deptId, programName, genericCode, 8] // Default generic code and 8 semesters
             );
@@ -607,8 +610,8 @@ const addClass = async (req, res) => {
         }
 
         // 2. Insert the subject
-        const codeToUse = subjectCode || `SUB-${Math.floor(Math.random() * 10000)}`;
-        const subjectRes = await pool.query(
+        const codeToUse = subjectCode || `SUB-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+        const subjectRes = await client.query(
             `INSERT INTO subjects (course_id, name, code, semester, credits, course_type, ltpj_code) 
              VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
             [courseId, subjectName || 'Custom Subject', codeToUse, semester, 3, courseType, ltpjCode] // default 3 credits
@@ -616,9 +619,9 @@ const addClass = async (req, res) => {
         const subjectId = subjectRes.rows[0].id;
 
         // 3. Link subject to faculty
-        await pool.query(
+        await client.query(
             `INSERT INTO subject_faculty (subject_id, faculty_id, role) VALUES ($1, $2, $3)
-             ON CONFLICT DO NOTHING`,
+             ON CONFLICT (subject_id, faculty_id) DO UPDATE SET role = EXCLUDED.role`,
             [subjectId, currentUserId, role || 'Theory']
         );
 
@@ -709,32 +712,32 @@ const addClass = async (req, res) => {
         const subtotalEvalUnits = weightedSeriesScripts + weightedEndSemScripts + weightedAssignmentScripts + weightedLabOutputs + weightedPracticalExams + weightedVivaVoce + weightedProjectEvals;
 
         // Fetch faculty name for easier viewing in pgAdmin
-        const userRes = await pool.query('SELECT name FROM users WHERE id = $1', [currentUserId]);
+        const userRes = await client.query('SELECT name FROM users WHERE id = $1', [currentUserId]);
         const facultyName = userRes.rows[0] ? userRes.rows[0].name : 'Unknown Faculty';
         const finalSubjectName = subjectName || 'Custom Subject';
 
-        await pool.query(
+        await client.query(
             `INSERT INTO teaching_loads 
              (subject_id, subject_name, faculty_id, faculty_name, students_in_class, theory_hours, lab_hours, project_hours, tutorial_hours, students_in_lab, students_in_project, subtotal_weighted_units, total_load)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
              [subjectId, finalSubjectName, currentUserId, facultyName, studentsClass, theoryHours, labHours, projectHours, tutorialHours, studentsLab, studentsProject, subtotalWeighted, totalLoad]
         );
 
-        await pool.query(
+        await client.query(
             `INSERT INTO paper_and_assignment_setting 
              (subject_id, subject_name, faculty_id, faculty_name, num_question_papers, num_assignments, num_question_bank, subtotal_setting_units)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
              [subjectId, finalSubjectName, currentUserId, facultyName, numQuestionPapers, numAssignments, 0, subtotalSettingUnits]
         );
 
-        await pool.query(
+        await client.query(
             `INSERT INTO preparation_and_course_factors 
              (subject_id, subject_name, faculty_id, faculty_name, theory_subject_prep, theory_rubrics_prep, theory_copo_mapping, lab_experiments_prep, lab_rubrics_prep, lab_eval_sheets_prep, lab_copo_mapping, project_rubrics_prep, project_eval_sheets_prep, project_copo_mapping, project_scheduling, extra_additions, total_load)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
              [subjectId, finalSubjectName, currentUserId, facultyName, prepTheorySubject, prepTheoryRubrics, prepTheoryCopo, prepLabExp, prepLabRubrics, prepLabEvalSheets, prepLabCopo, prepProjRubrics, prepProjEvalSheets, prepProjCopo, prepProjScheduling, 0, subtotalPrepUnits]
         );
 
-        await pool.query(
+        await client.query(
             `INSERT INTO evaluation_units 
              (subject_id, subject_name, faculty_id, faculty_name, series_answer_scripts, end_sem_answer_scripts, assignment_scripts, lab_output_evaluations, practical_exam_evals, viva_voce_count, project_evaluations, subtotal_evaluation_units)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
@@ -743,12 +746,14 @@ const addClass = async (req, res) => {
 
         const grandTotal = (totalLoad + subtotalSettingUnits + subtotalPrepUnits + subtotalEvalUnits) * experienceMultiplier;
 
-        await pool.query(
+        await client.query(
             `INSERT INTO workload_master 
              (subject_id, subject_name, faculty_id, faculty_name, teaching_load_units, question_setting_units, prep_adjustment_units, evaluation_units, theory_hours_per_week, experience_multiplier, grand_total_workload_units)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
              [subjectId, finalSubjectName, currentUserId, facultyName, totalLoad, subtotalSettingUnits, subtotalPrepUnits, subtotalEvalUnits, theoryHours, experienceMultiplier, grandTotal]
         );
+
+        await client.query('COMMIT');
 
         return res.status(200).json({
             success: true,
@@ -756,11 +761,14 @@ const addClass = async (req, res) => {
         });
 
     } catch (error) {
+        await client.query('ROLLBACK');
         console.error("Add class error:", error);
         return res.status(500).json({
             success: false,
-            message: "Server error while adding class."
+            message: error.message || "Server error while adding class."
         });
+    } finally {
+        client.release();
     }
 };
 
@@ -791,6 +799,376 @@ const getHodSummary = async (req, res) => {
     }
 };
 
+// =====================================================
+// 8. GET DEPARTMENT & DOMAIN WORKLOAD MASTER (Roles & Tasks)
+// =====================================================
+
+const WORKLOAD_CATALOGS = require('../config/workloadMasterCatalogs');
+
+const getWorkloadCatalogs = (req, res) => {
+    return res.status(200).json({
+        success: true,
+        catalogs: WORKLOAD_CATALOGS
+    });
+};
+
+const getDepartmentMaster = async (req, res) => {
+    try {
+        const { category } = req.query;
+        let rolesQuery = 'SELECT * FROM department_roles_master';
+        let tasksQuery = 'SELECT * FROM department_tasks_master';
+        const params = [];
+
+        if (category && category !== 'all') {
+            params.push(category);
+            rolesQuery += ' WHERE category = $1';
+            tasksQuery += ' WHERE category = $1';
+        }
+
+        rolesQuery += ' ORDER BY id ASC';
+        tasksQuery += ' ORDER BY role_id ASC, id ASC';
+
+        const rolesRes = await pool.query(rolesQuery, params);
+        const tasksRes = await pool.query(tasksQuery, params);
+
+        return res.status(200).json({
+            success: true,
+            roles: rolesRes.rows,
+            tasks: tasksRes.rows,
+            catalogs: WORKLOAD_CATALOGS
+        });
+    } catch (error) {
+        console.error("Get department master error:", error);
+        return res.status(500).json({ success: false, message: "Server error while fetching master data." });
+    }
+};
+
+// =====================================================
+// 9. GET FACULTY WORKLOAD (Multi-Domain / Category Filtered)
+// =====================================================
+
+const getFacultyDepartmentWorkload = async (req, res) => {
+    try {
+        const facultyId = req.user?.userId || req.user?.id || req.query?.faculty_id || 2;
+        const { category } = req.query;
+
+        let query = `
+            SELECT 
+                id,
+                faculty_id,
+                faculty_name,
+                role_id,
+                role_name,
+                task_id,
+                task_name,
+                work_unit,
+                quantity,
+                std_effort,
+                occurrences,
+                complexity_factor,
+                calculated_workload,
+                remarks,
+                category,
+                created_at,
+                updated_at
+             FROM faculty_department_workload
+             WHERE faculty_id = $1
+        `;
+        const params = [facultyId];
+
+        if (category && category !== 'all') {
+            params.push(category);
+            query += ` AND category = $${params.length}`;
+        }
+
+        query += ` ORDER BY category ASC, role_id ASC, task_id ASC`;
+
+        const result = await pool.query(query, params);
+
+        // Also compute category breakdown across ALL allocations for this faculty
+        const allRes = await pool.query(
+            `SELECT category, calculated_workload FROM faculty_department_workload WHERE faculty_id = $1`,
+            [facultyId]
+        );
+
+        const categoryBreakdown = {
+            Department: { hours: 0, count: 0 },
+            Institutional: { hours: 0, count: 0 },
+            ExtraProactive: { hours: 0, count: 0 },
+            FDP_Workshop: { hours: 0, count: 0 },
+            Research: { hours: 0, count: 0 },
+            Consultancy: { hours: 0, count: 0 }
+        };
+
+        let grandTotal = 0;
+        allRes.rows.forEach(r => {
+            const cat = r.category || 'Department';
+            const hrs = parseFloat(r.calculated_workload || 0);
+            if (!categoryBreakdown[cat]) {
+                categoryBreakdown[cat] = { hours: 0, count: 0 };
+            }
+            categoryBreakdown[cat].hours = parseFloat((categoryBreakdown[cat].hours + hrs).toFixed(2));
+            categoryBreakdown[cat].count += 1;
+            grandTotal += hrs;
+        });
+
+        const filteredTotalHours = result.rows.reduce((sum, r) => sum + parseFloat(r.calculated_workload || 0), 0);
+
+        return res.status(200).json({
+            success: true,
+            allocations: result.rows,
+            summary: {
+                totalHours: parseFloat(filteredTotalHours.toFixed(2)),
+                taskCount: result.rows.length,
+                grandTotalHours: parseFloat(grandTotal.toFixed(2)),
+                categoryBreakdown
+            }
+        });
+    } catch (error) {
+        console.error("Get faculty workload error:", error);
+        return res.status(500).json({ success: false, message: "Server error while fetching faculty workload." });
+    }
+};
+
+// =====================================================
+// 10. SAVE / UPDATE FACULTY WORKLOAD (Any Domain)
+// =====================================================
+
+const saveFacultyDepartmentWorkload = async (req, res) => {
+    try {
+        const facultyId = req.user?.userId || req.user?.id || req.body?.faculty_id || 2;
+
+        const userRes = await pool.query('SELECT name FROM users WHERE id = $1', [facultyId]);
+        const facultyName = userRes.rows[0]?.name || 'Faculty Member';
+
+        const {
+            role_id,
+            role_name,
+            task_id,
+            task_name,
+            work_unit,
+            quantity,
+            std_effort,
+            occurrences,
+            complexity_factor,
+            remarks,
+            category
+        } = req.body;
+
+        if (!role_id || !task_id) {
+            return res.status(400).json({ success: false, message: "Role and Task are required." });
+        }
+
+        const cat = category || 'Department';
+        const qty = parseFloat(quantity) || 1;
+        const effort = parseFloat(std_effort) || 1;
+        const occ = parseInt(occurrences) || 1;
+        const comp = parseFloat(complexity_factor) || 1.0;
+        const calculated = parseFloat((qty * effort * occ * comp).toFixed(2));
+
+        const insertRes = await pool.query(
+            `INSERT INTO faculty_department_workload
+             (faculty_id, faculty_name, role_id, role_name, task_id, task_name, work_unit, quantity, std_effort, occurrences, complexity_factor, calculated_workload, remarks, category, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
+             ON CONFLICT (faculty_id, task_id) DO UPDATE SET
+                role_name = EXCLUDED.role_name,
+                task_name = EXCLUDED.task_name,
+                work_unit = EXCLUDED.work_unit,
+                quantity = EXCLUDED.quantity,
+                std_effort = EXCLUDED.std_effort,
+                occurrences = EXCLUDED.occurrences,
+                complexity_factor = EXCLUDED.complexity_factor,
+                calculated_workload = EXCLUDED.calculated_workload,
+                remarks = EXCLUDED.remarks,
+                category = EXCLUDED.category,
+                updated_at = CURRENT_TIMESTAMP
+             RETURNING *`,
+            [
+                facultyId, facultyName, role_id, role_name || '', task_id,
+                task_name || '', work_unit || 'Unit', qty, effort, occ, comp, calculated, remarks || '', cat
+            ]
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: `${cat} workload allocation saved successfully.`,
+            item: insertRes.rows[0]
+        });
+    } catch (error) {
+        console.error("Save faculty workload error:", error);
+        return res.status(500).json({ success: false, message: "Server error while saving workload." });
+    }
+};
+
+// =====================================================
+// 11. DELETE FACULTY WORKLOAD ALLOCATION
+// =====================================================
+
+const deleteFacultyDepartmentWorkload = async (req, res) => {
+    try {
+        const facultyId = req.user?.userId || req.user?.id || req.query?.faculty_id || 2;
+        const { id } = req.params;
+
+        let query = '';
+        let params = [];
+
+        if (isNaN(id)) {
+            query = 'DELETE FROM faculty_department_workload WHERE faculty_id = $1 AND task_id = $2 RETURNING id';
+            params = [facultyId, id];
+        } else {
+            query = 'DELETE FROM faculty_department_workload WHERE faculty_id = $1 AND id = $2 RETURNING id';
+            params = [facultyId, parseInt(id)];
+        }
+
+        const deleteRes = await pool.query(query, params);
+
+        if (deleteRes.rowCount === 0) {
+            return res.status(404).json({ success: false, message: "Task allocation not found or unauthorized." });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Workload task allocation removed successfully."
+        });
+    } catch (error) {
+        console.error("Delete faculty workload error:", error);
+        return res.status(500).json({ success: false, message: "Server error while removing workload item." });
+    }
+};
+
+// =====================================================
+// 12. GET HOD WORKLOAD SUMMARY (Multi-Category Filtered)
+// =====================================================
+
+const getHodDepartmentSummary = async (req, res) => {
+    try {
+        const currentUserId = req.user?.userId || req.user?.id;
+        const selectedCategory = req.query?.category || 'Department';
+
+        let facultyQuery = `
+            SELECT id, custom_id, name, email
+            FROM users
+            WHERE role = 'faculty' AND is_hod = false
+        `;
+        const params = [];
+
+        if (req.user?.isHod && currentUserId) {
+            const deptRes = await pool.query(
+                `SELECT id FROM departments WHERE hod_user_id = $1 UNION SELECT department_id FROM user_departments WHERE user_id = $1`,
+                [currentUserId]
+            );
+            if (deptRes.rows.length > 0) {
+                const deptIds = deptRes.rows.map(r => r.id);
+                params.push(deptIds);
+                facultyQuery += ` AND id IN (
+                    SELECT user_id FROM user_departments WHERE department_id = ANY($${params.length})
+                    UNION
+                    SELECT sf.faculty_id FROM subject_faculty sf 
+                    JOIN subjects s ON sf.subject_id = s.id 
+                    JOIN courses c ON s.course_id = c.id 
+                    WHERE c.department_id = ANY($${params.length})
+                )`;
+            }
+        }
+
+        facultyQuery += ` ORDER BY name ASC`;
+        const facultyRes = await pool.query(facultyQuery, params);
+        const facultyList = facultyRes.rows;
+
+        // Query allocations, optionally filtered by category
+        let workloadSql = `
+            SELECT 
+                fdw.*,
+                u.custom_id AS faculty_custom_id
+            FROM faculty_department_workload fdw
+            JOIN users u ON fdw.faculty_id = u.id
+        `;
+        const workloadParams = [];
+        if (selectedCategory && selectedCategory !== 'all') {
+            workloadParams.push(selectedCategory);
+            workloadSql += ` WHERE fdw.category = $1`;
+        }
+        workloadSql += ` ORDER BY fdw.faculty_name ASC, fdw.role_id ASC, fdw.task_id ASC`;
+
+        const workloadRes = await pool.query(workloadSql, workloadParams);
+        const allWorkloads = workloadRes.rows;
+
+        const facultyMap = {};
+        facultyList.forEach(f => {
+            facultyMap[f.id] = {
+                faculty_id: f.id,
+                custom_id: f.custom_id || `FAC${f.id}`,
+                faculty_name: f.name,
+                email: f.email,
+                department_workload_hours: 0,
+                number_of_tasks: 0,
+                tasks: []
+            };
+        });
+
+        allWorkloads.forEach(row => {
+            if (facultyMap[row.faculty_id]) {
+                const hours = parseFloat(row.calculated_workload || 0);
+                facultyMap[row.faculty_id].department_workload_hours += hours;
+                facultyMap[row.faculty_id].number_of_tasks += 1;
+                facultyMap[row.faculty_id].tasks.push({
+                    id: row.id,
+                    role_id: row.role_id,
+                    role_name: row.role_name,
+                    task_id: row.task_id,
+                    task_name: row.task_name,
+                    work_unit: row.work_unit,
+                    quantity: parseFloat(row.quantity),
+                    std_effort: parseFloat(row.std_effort),
+                    occurrences: parseInt(row.occurrences),
+                    complexity_factor: parseFloat(row.complexity_factor),
+                    calculated_workload: hours,
+                    remarks: row.remarks,
+                    category: row.category || 'Department'
+                });
+            }
+        });
+
+        const facultySummary = Object.values(facultyMap);
+
+        const departmentTotalHours = facultySummary.reduce((sum, f) => sum + f.department_workload_hours, 0);
+        const activeFacultiesWithTasks = facultySummary.filter(f => f.number_of_tasks > 0);
+        const divisor = activeFacultiesWithTasks.length > 0 ? activeFacultiesWithTasks.length : (facultySummary.length || 1);
+        const departmentAverageHours = parseFloat((departmentTotalHours / divisor).toFixed(2));
+
+        facultySummary.forEach(f => {
+            f.department_workload_hours = parseFloat(f.department_workload_hours.toFixed(2));
+            if (departmentTotalHours > 0) {
+                f.workload_share_pct = parseFloat(((f.department_workload_hours / departmentTotalHours) * 100).toFixed(1));
+            } else {
+                f.workload_share_pct = 0.0;
+            }
+
+            if (f.number_of_tasks === 0) {
+                f.interpretation = "No data entered";
+            } else if (f.department_workload_hours >= departmentAverageHours) {
+                f.interpretation = "Above department average";
+            } else {
+                f.interpretation = "Below department average";
+            }
+        });
+
+        return res.status(200).json({
+            success: true,
+            category: selectedCategory,
+            department_total_hours: parseFloat(departmentTotalHours.toFixed(2)),
+            department_average_hours: departmentAverageHours,
+            total_faculties: facultySummary.length,
+            faculty_summary: facultySummary,
+            all_allocations: allWorkloads
+        });
+
+    } catch (error) {
+        console.error("Get HOD workload summary error:", error);
+        return res.status(500).json({ success: false, message: "Server error while fetching HOD workload summary." });
+    }
+};
+
 module.exports = {
     getSubjects,
     getFaculty,
@@ -798,5 +1176,11 @@ module.exports = {
     suggestTask,
     assignTask,
     addClass,
-    getHodSummary
+    getHodSummary,
+    getWorkloadCatalogs,
+    getDepartmentMaster,
+    getFacultyDepartmentWorkload,
+    saveFacultyDepartmentWorkload,
+    deleteFacultyDepartmentWorkload,
+    getHodDepartmentSummary
 };

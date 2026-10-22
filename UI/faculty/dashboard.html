@@ -50,6 +50,24 @@
                 </li>
                 <li class="nav-item" data-target="taskAssignment"><span class="material-symbols-outlined"
                         style="margin-right: 8px; vertical-align: middle; font-size: 20px;">task</span> Assign Work</li>
+                <li class="nav-item" data-target="deptWorkload"><span class="material-symbols-outlined"
+                        style="margin-right: 8px; vertical-align: middle; font-size: 20px;">account_tree</span> Department Workload
+                </li>
+                <li class="nav-item" data-target="instWorkload"><span class="material-symbols-outlined"
+                        style="margin-right: 8px; vertical-align: middle; font-size: 20px;">corporate_fare</span> Institutional Work
+                </li>
+                <li class="nav-item" data-target="extraWorkload"><span class="material-symbols-outlined"
+                        style="margin-right: 8px; vertical-align: middle; font-size: 20px;">rocket_launch</span> Extra Proactive Work
+                </li>
+                <li class="nav-item" data-target="fdpWorkload"><span class="material-symbols-outlined"
+                        style="margin-right: 8px; vertical-align: middle; font-size: 20px;">school</span> FDPs & Workshops
+                </li>
+                <li class="nav-item" data-target="researchWorkload"><span class="material-symbols-outlined"
+                        style="margin-right: 8px; vertical-align: middle; font-size: 20px;">biotech</span> Research Workload
+                </li>
+                <li class="nav-item" data-target="consultancyWorkload"><span class="material-symbols-outlined"
+                        style="margin-right: 8px; vertical-align: middle; font-size: 20px;">handshake</span> Consultancy
+                </li>
                 <li class="nav-item" data-target="studentMarks"><span class="material-symbols-outlined"
                         style="margin-right: 8px; vertical-align: middle; font-size: 20px;">star</span> Student Marks
                 </li>
@@ -127,6 +145,161 @@
                         <div>
                             <h3 style="margin: 0; font-size: 1.8rem; color: var(--primary-color);" id="statTasks">0</h3>
                             <p style="margin: 4px 0 0 0;">Pending Tasks (From HOD)</p>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #6366f1;">
+                        <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">analytics</span>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.8rem; color: #4338ca;" id="statTotalWorkloadHours">0.00 hrs</h3>
+                            <p style="margin: 4px 0 0 0; font-weight: 500;">Combined Workload (All Domains)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Comprehensive Multi-Domain Workload Portfolio Grid -->
+                <div class="glass-panel" style="padding: 24px; margin-top: 28px; background: #ffffff;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.35rem; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                                <span class="material-symbols-outlined" style="color: var(--primary-color);">work_history</span>
+                                Institutional & Multi-Domain Workload Portfolio
+                            </h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.9rem;">
+                                Complete overview of your responsibilities across all 6 official academic and administrative domains (TKMCE MCA Regulations 2023).
+                            </p>
+                        </div>
+                        <span id="overviewTotalWorkloadBadge" class="badge" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 6px 14px; border-radius: 12px; font-weight: 700; font-size: 0.9rem;">
+                            Live Semester Workload
+                        </span>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                        <!-- 1. Department Workload Card -->
+                        <div class="stat-card" style="border-left: 4px solid #4338ca; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px;">
+                            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div class="stat-icon" style="background: #eef2ff; color: #4338ca; padding: 8px; border-radius: 8px;">
+                                        <span class="material-symbols-outlined" style="font-size: 24px;">account_tree</span>
+                                    </div>
+                                    <h4 style="margin: 0; font-size: 1.05rem; color: #1e1b4b;">Department Workload</h4>
+                                </div>
+                                <span id="ovDeptTasks" style="font-size: 0.8rem; font-weight: 700; background: #eef2ff; color: #3730a3; padding: 2px 8px; border-radius: 6px;">0 Tasks</span>
+                            </div>
+                            <div>
+                                <span id="ovDeptHours" style="font-size: 1.6rem; font-weight: 800; color: #312e81;">0.00 hrs</span>
+                                <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: #64748b;">Advisor, Lab In-charge, DQAC, Timetable</p>
+                            </div>
+                            <div style="display: flex; gap: 8px; width: 100%; margin-top: 4px;">
+                                <button type="button" class="btn-secondary" onclick="switchNavSection('deptWorkload')" style="flex: 1; padding: 6px 10px; font-size: 0.82rem; font-weight: 600;">View Details</button>
+                                <button type="button" class="btn-primary" onclick="openAllocateRoleModal('Department')" style="flex: 1; padding: 6px 10px; font-size: 0.82rem; font-weight: 600;">+ Allocate</button>
+                            </div>
+                        </div>
+
+                        <!-- 2. Institutional Work Card -->
+                        <div class="stat-card" style="border-left: 4px solid #0284c7; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px;">
+                            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div class="stat-icon" style="background: #f0f9ff; color: #0284c7; padding: 8px; border-radius: 8px;">
+                                        <span class="material-symbols-outlined" style="font-size: 24px;">corporate_fare</span>
+                                    </div>
+                                    <h4 style="margin: 0; font-size: 1.05rem; color: #082f49;">Institutional Work</h4>
+                                </div>
+                                <span id="ovInstTasks" style="font-size: 0.8rem; font-weight: 700; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 6px;">0 Tasks</span>
+                            </div>
+                            <div>
+                                <span id="ovInstHours" style="font-size: 1.6rem; font-weight: 800; color: #075985;">0.00 hrs</span>
+                                <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: #64748b;">IQAC, Exam Cell, Admissions, Hostel, Placement</p>
+                            </div>
+                            <div style="display: flex; gap: 8px; width: 100%; margin-top: 4px;">
+                                <button type="button" class="btn-secondary" onclick="switchNavSection('instWorkload')" style="flex: 1; padding: 6px 10px; font-size: 0.82rem; font-weight: 600;">View Details</button>
+                                <button type="button" class="btn-primary" onclick="openAllocateRoleModal('Institutional')" style="flex: 1; padding: 6px 10px; font-size: 0.82rem; font-weight: 600; background: #0284c7;">+ Allocate</button>
+                            </div>
+                        </div>
+
+                        <!-- 3. Extra Work Done Proactively Card -->
+                        <div class="stat-card" style="border-left: 4px solid #d97706; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px;">
+                            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div class="stat-icon" style="background: #fffbeb; color: #d97706; padding: 8px; border-radius: 8px;">
+                                        <span class="material-symbols-outlined" style="font-size: 24px;">rocket_launch</span>
+                                    </div>
+                                    <h4 style="margin: 0; font-size: 1.05rem; color: #451a03;">Extra Work Proactively</h4>
+                                </div>
+                                <span id="ovExtraTasks" style="font-size: 0.8rem; font-weight: 700; background: #fef3c7; color: #b45309; padding: 2px 8px; border-radius: 6px;">0 Tasks</span>
+                            </div>
+                            <div>
+                                <span id="ovExtraHours" style="font-size: 1.6rem; font-weight: 800; color: #92400e;">0.00 hrs</span>
+                                <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: #64748b;">Clubs, Hackathons, Tech Fest, Newsletters, NSS</p>
+                            </div>
+                            <div style="display: flex; gap: 8px; width: 100%; margin-top: 4px;">
+                                <button type="button" class="btn-secondary" onclick="switchNavSection('extraWorkload')" style="flex: 1; padding: 6px 10px; font-size: 0.82rem; font-weight: 600;">View Details</button>
+                                <button type="button" class="btn-primary" onclick="openAllocateRoleModal('ExtraProactive')" style="flex: 1; padding: 6px 10px; font-size: 0.82rem; font-weight: 600; background: #d97706;">+ Allocate</button>
+                            </div>
+                        </div>
+
+                        <!-- 4. FDPs & Workshops Card -->
+                        <div class="stat-card" style="border-left: 4px solid #059669; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px;">
+                            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div class="stat-icon" style="background: #ecfdf5; color: #059669; padding: 8px; border-radius: 8px;">
+                                        <span class="material-symbols-outlined" style="font-size: 24px;">school</span>
+                                    </div>
+                                    <h4 style="margin: 0; font-size: 1.05rem; color: #064e3b;">FDPs & Workshops</h4>
+                                </div>
+                                <span id="ovFdpTasks" style="font-size: 0.8rem; font-weight: 700; background: #d1fae5; color: #047857; padding: 2px 8px; border-radius: 6px;">0 Tasks</span>
+                            </div>
+                            <div>
+                                <span id="ovFdpHours" style="font-size: 1.6rem; font-weight: 800; color: #065f46;">0.00 hrs</span>
+                                <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: #64748b;">STTPs, Bootcamps, Expert Talks, Certifications</p>
+                            </div>
+                            <div style="display: flex; gap: 8px; width: 100%; margin-top: 4px;">
+                                <button type="button" class="btn-secondary" onclick="switchNavSection('fdpWorkload')" style="flex: 1; padding: 6px 10px; font-size: 0.82rem; font-weight: 600;">View Details</button>
+                                <button type="button" class="btn-primary" onclick="openAllocateRoleModal('FDP_Workshop')" style="flex: 1; padding: 6px 10px; font-size: 0.82rem; font-weight: 600; background: #059669;">+ Allocate</button>
+                            </div>
+                        </div>
+
+                        <!-- 5. Own Research Workload Card -->
+                        <div class="stat-card" style="border-left: 4px solid #7c3aed; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px;">
+                            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div class="stat-icon" style="background: #f5f3ff; color: #7c3aed; padding: 8px; border-radius: 8px;">
+                                        <span class="material-symbols-outlined" style="font-size: 24px;">biotech</span>
+                                    </div>
+                                    <h4 style="margin: 0; font-size: 1.05rem; color: #2e1065;">Own Research Workload</h4>
+                                </div>
+                                <span id="ovResearchTasks" style="font-size: 0.8rem; font-weight: 700; background: #ede9fe; color: #6d28d9; padding: 2px 8px; border-radius: 6px;">0 Tasks</span>
+                            </div>
+                            <div>
+                                <span id="ovResearchHours" style="font-size: 1.6rem; font-weight: 800; color: #5b21b6;">0.00 hrs</span>
+                                <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: #64748b;">Funded Projects, MCA Guidance [23MCAN402], Patents</p>
+                            </div>
+                            <div style="display: flex; gap: 8px; width: 100%; margin-top: 4px;">
+                                <button type="button" class="btn-secondary" onclick="switchNavSection('researchWorkload')" style="flex: 1; padding: 6px 10px; font-size: 0.82rem; font-weight: 600;">View Details</button>
+                                <button type="button" class="btn-primary" onclick="openAllocateRoleModal('Research')" style="flex: 1; padding: 6px 10px; font-size: 0.82rem; font-weight: 600; background: #7c3aed;">+ Allocate</button>
+                            </div>
+                        </div>
+
+                        <!-- 6. Consultancy Card -->
+                        <div class="stat-card" style="border-left: 4px solid #0891b2; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px;">
+                            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div class="stat-icon" style="background: #ecfeff; color: #0891b2; padding: 8px; border-radius: 8px;">
+                                        <span class="material-symbols-outlined" style="font-size: 24px;">handshake</span>
+                                    </div>
+                                    <h4 style="margin: 0; font-size: 1.05rem; color: #164e63;">Consultancy & Services</h4>
+                                </div>
+                                <span id="ovConsultancyTasks" style="font-size: 0.8rem; font-weight: 700; background: #cffafe; color: #0e7490; padding: 2px 8px; border-radius: 6px;">0 Tasks</span>
+                            </div>
+                            <div>
+                                <span id="ovConsultancyHours" style="font-size: 1.6rem; font-weight: 800; color: #155e75;">0.00 hrs</span>
+                                <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: #64748b;">Industrial Software, Security Audits, Training</p>
+                            </div>
+                            <div style="display: flex; gap: 8px; width: 100%; margin-top: 4px;">
+                                <button type="button" class="btn-secondary" onclick="switchNavSection('consultancyWorkload')" style="flex: 1; padding: 6px 10px; font-size: 0.82rem; font-weight: 600;">View Details</button>
+                                <button type="button" class="btn-primary" onclick="openAllocateRoleModal('Consultancy')" style="flex: 1; padding: 6px 10px; font-size: 0.82rem; font-weight: 600; background: #0891b2;">+ Allocate</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -234,33 +407,29 @@
 
                     <form id="assignWorkForm" style="margin-top: 16px;">
                         <div class="form-group" style="margin-bottom: 16px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Target Class /
-                                Subject</label>
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">Target Class / Subject</label>
                             <select id="workClassSelect" required
-                                style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg); color: var(--text-color);">
+                                style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #1e293b; font-size: 0.95rem;">
                                 <!-- Populated by JS -->
                             </select>
                         </div>
                         <div class="form-group" style="margin-bottom: 16px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Assignment
-                                Title</label>
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">Assignment Title</label>
                             <input type="text" id="workTitle" required
                                 placeholder="e.g. Operating Systems - Assignment 2 (Process Scheduling)"
-                                style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg); color: var(--text-color);">
+                                style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #1e293b; font-size: 0.95rem;">
                         </div>
                         <div class="form-group" style="margin-bottom: 16px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Assignment Instructions
-                                / Description</label>
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">Assignment Instructions / Description</label>
                             <textarea id="workDesc" rows="3" required
                                 placeholder="Describe the assignment scope, deliverable format, requirements..."
-                                style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg); color: var(--text-color);"></textarea>
+                                style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #1e293b; font-size: 0.95rem;"></textarea>
                         </div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px;">
                             <div class="form-group">
-                                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Difficulty
-                                    (1-10)</label>
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">Difficulty (1-10)</label>
                                 <select id="workDifficulty" required
-                                    style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg); color: var(--text-color);">
+                                    style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #1e293b; font-size: 0.95rem;">
                                     <option value="2">2 - Very Light</option>
                                     <option value="4" selected>4 - Moderate (Standard)</option>
                                     <option value="6">6 - High Effort</option>
@@ -269,18 +438,18 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Due Date</label>
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">Due Date</label>
                                 <input type="date" id="workDeadline" required
-                                    style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg); color: var(--text-color);">
+                                    style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #1e293b; font-size: 0.95rem;">
                             </div>
                             <div class="form-group">
-                                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Max Marks</label>
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">Max Marks</label>
                                 <input type="number" id="workMaxMarks" value="100" min="10" max="100" required
-                                    style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg); color: var(--text-color);">
+                                    style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #1e293b; font-size: 0.95rem;">
                             </div>
                         </div>
                         <button type="submit" id="btnSubmitAssign" class="btn-primary"
-                            style="width: 100%; padding: 14px; font-size: 1rem;">
+                            style="width: 100%; padding: 14px; font-size: 1rem; font-weight: 600;">
                             🚀 Validate Workload & Assign
                         </button>
                     </form>
@@ -307,30 +476,29 @@
 
                 <!-- Student Workload Warning & Alternative Recommendations Modal -->
                 <div id="studentWorkloadModal" class="modal-overlay"
-                    style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
-                    <div class="glass-panel"
-                        style="max-width: 580px; width: 90%; max-height: 90vh; overflow-y: auto; padding: 28px; border: 1px solid rgba(237, 137, 54, 0.5); box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+                    style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;">
+                    <div style="background: #ffffff; max-width: 580px; width: 90%; max-height: 90vh; overflow-y: auto; padding: 28px; border: 1.5px solid #fed7aa; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35);">
                         <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
                             <span style="font-size: 2rem;">⚠️</span>
                             <div>
-                                <h3 style="margin: 0; color: #ed8936;">Student Workload Alert</h3>
-                                <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: var(--text-light);"
+                                <h3 style="margin: 0; color: #c2410c; font-size: 1.3rem;">Student Workload Alert</h3>
+                                <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #7c2d12; font-weight: 500;"
                                     id="modalClassNotice">Target Class Overloaded</p>
                             </div>
                         </div>
 
                         <div
-                            style="background: rgba(237, 137, 54, 0.1); border-left: 4px solid #ed8936; padding: 14px; border-radius: 4px; margin-bottom: 20px;">
+                            style="background: #fff7ed; border-left: 4px solid #ea580c; border: 1px solid #ffedd5; padding: 14px 16px; border-radius: 8px; margin-bottom: 20px;">
                             <p id="modalWorkloadSummary"
-                                style="margin: 0; font-size: 0.95rem; line-height: 1.5; color: var(--text-color);">
+                                style="margin: 0; font-size: 0.95rem; line-height: 1.5; color: #9a3412; font-weight: 500;">
                                 Assigning this task on the selected date exceeds the daily student workload limit.
                             </p>
                             <div id="modalCollidingAssignments"
-                                style="margin-top: 10px; font-size: 0.85rem; color: var(--text-light);"></div>
+                                style="margin-top: 10px; font-size: 0.85rem; color: #c2410c;"></div>
                         </div>
 
-                        <h4 style="margin-bottom: 12px; color: var(--primary-color);">Recommended Alternative Dates</h4>
-                        <p style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 12px;">Pick one of the
+                        <h4 style="margin-bottom: 12px; color: #0b7a75; font-size: 1.05rem;">Recommended Alternative Dates</h4>
+                        <p style="font-size: 0.88rem; color: #475569; margin-bottom: 14px;">Pick one of the
                             available dates below where students have low workload:</p>
 
                         <div id="modalAlternativeDatesList"
@@ -339,12 +507,11 @@
                         </div>
 
                         <div
-                            style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--glass-border); padding-top: 16px;">
-                            <button type="button" id="btnCancelAssignment" class="btn-primary"
-                                style="background: rgba(255,255,255,0.08); border: 1px solid var(--glass-border);">Cancel</button>
+                            style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+                            <button type="button" id="btnCancelAssignment" class="btn-secondary"
+                                style="padding: 10px 20px;">Cancel</button>
                             <button type="button" id="btnOverrideAssignment" class="btn-primary"
-                                style="background: rgba(237, 137, 54, 0.2); border: 1px solid #ed8936; color: #ed8936;">Assign
-                                Anyway (Override)</button>
+                                style="background: #ea580c; border: none; color: #ffffff; padding: 10px 20px; font-weight: 600;">Assign Anyway (Override)</button>
                         </div>
                     </div>
                 </div>
@@ -422,8 +589,8 @@
                             style="padding: 20px; border-top: 1px solid var(--glass-border); display: none;">
                             <form id="chatForm" style="display: flex; gap: 12px; width: 100%;">
                                 <input type="text" id="chatMessageInput" placeholder="Type a message..." required
-                                    style="flex: 1; padding: 12px 16px; border-radius: 20px; border: 1px solid var(--glass-border); background: var(--input-bg);">
-                                <button type="submit" class="btn-primary" style="border-radius: 20px;">Send</button>
+                                    style="flex: 1; padding: 12px 18px; border-radius: 20px; border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 0.95rem; outline: none;">
+                                <button type="submit" class="btn-primary" style="border-radius: 20px; padding: 10px 22px; font-weight: 600;">Send</button>
                             </form>
                         </div>
                     </div>
@@ -476,71 +643,857 @@
                 </div>
             </section>
 
+            <!-- 9. Department Workload Allocation Section -->
+            <section id="deptWorkload" class="content-section">
+                <!-- Domain Switcher Tabs -->
+                <div class="domain-tabs-nav" style="display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px;">
+                    <button type="button" class="btn-primary" onclick="switchNavSection('deptWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">account_tree</span> 1. Department Workload
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('instWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">corporate_fare</span> 2. Institutional Work
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('extraWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">rocket_launch</span> 3. Extra Proactive
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('fdpWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">school</span> 4. FDPs & Workshops
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('researchWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">biotech</span> 5. Research Workload
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('consultancyWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">handshake</span> 6. Consultancy
+                    </button>
+                </div>
+
+                <!-- Header Card -->
+                <div class="glass-card" style="padding: 24px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 1.6rem; color: var(--text-color); display: flex; align-items: center; gap: 10px;">
+                            <span class="material-symbols-outlined" style="color: #6366f1; font-size: 28px;">account_tree</span>
+                            Department Roles & Workload Allocation
+                        </h2>
+                        <p style="margin: 6px 0 0 0; color: var(--text-light); font-size: 0.95rem;">
+                            Select assigned departmental roles and measurable tasks based on standard effort, quantity, and semester occurrences.
+                        </p>
+                    </div>
+                    <button type="button" class="btn-primary" onclick="openAllocateRoleModal('Department')" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; font-weight: 600; cursor: pointer;">
+                        <span class="material-symbols-outlined" style="font-size: 20px;">add_circle</span>
+                        + Allocate Department Role
+                    </button>
+                </div>
+
+                <!-- Summary KPI Grid -->
+                <div class="dashboard-grid" style="margin-bottom: 24px;">
+                    <div class="stat-card" style="border-left: 4px solid #4338ca; background: #ffffff;">
+                        <div class="stat-icon" style="background: #eff6ff; color: #4338ca;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">timer</span>
+                        </div>
+                        <div>
+                            <h3 id="deptKpiTotalHours" style="margin: 0; font-size: 1.8rem; color: #312e81; font-weight: 700;">0.00 hrs</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.9rem; font-weight: 500;">Total Department Workload</p>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #047857; background: #ffffff;">
+                        <div class="stat-icon" style="background: #ecfdf5; color: #047857;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">checklist</span>
+                        </div>
+                        <div>
+                            <h3 id="deptKpiTaskCount" style="margin: 0; font-size: 1.8rem; color: #064e3b; font-weight: 700;">0</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.9rem; font-weight: 500;">Allocated Department Tasks</p>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #b45309; background: #ffffff;">
+                        <div class="stat-icon" style="background: #fffbeb; color: #b45309;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">functions</span>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.1rem; color: #92400e; font-weight: 700;">Effort × Qty × Occ × Comp</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.85rem; font-weight: 500;">Standard Formula Applied</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Allocations Data Table Panel -->
+                <div class="glass-panel" style="padding: 24px; background: #ffffff;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h3 style="margin: 0; color: #0f172a;">My Department Workload Breakdown</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.85rem;">Individual task workloads contributed by your assigned departmental responsibilities.</p>
+                        </div>
+                        <span id="deptWorkloadTableCountBadge" class="badge" style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 4px 12px; border-radius: 12px; font-weight: 600; font-size: 0.85rem;">
+                            0 Tasks Active
+                        </span>
+                    </div>
+
+                    <div style="overflow-x: auto;">
+                        <table class="data-table" style="width: 100%; border-collapse: collapse; min-width: 850px;">
+                            <thead>
+                                <tr style="border-bottom: 2px solid var(--glass-border); text-align: left;">
+                                    <th style="padding: 12px 10px;">Task ID</th>
+                                    <th style="padding: 12px 10px;">Role</th>
+                                    <th style="padding: 12px 10px;">Responsibility / Task</th>
+                                    <th style="padding: 12px 10px;">Unit</th>
+                                    <th style="padding: 12px 10px;">Quantity</th>
+                                    <th style="padding: 12px 10px;">Std. Effort</th>
+                                    <th style="padding: 12px 10px;">Occurrences</th>
+                                    <th style="padding: 12px 10px;">Complexity</th>
+                                    <th style="padding: 12px 10px;">Calculated Workload</th>
+                                    <th style="padding: 12px 10px;">Remarks</th>
+                                    <th style="padding: 12px 10px; text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="facultyDeptWorkloadList">
+                                <tr>
+                                    <td colspan="11" style="text-align: center; padding: 30px; color: var(--text-light);">
+                                        Loading department workload allocations...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 10. Institutional Work Section -->
+            <section id="instWorkload" class="content-section">
+                <!-- Domain Switcher Tabs -->
+                <div class="domain-tabs-nav" style="display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px;">
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('deptWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">account_tree</span> 1. Department Workload
+                    </button>
+                    <button type="button" class="btn-primary" onclick="switchNavSection('instWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600; background: #0284c7;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">corporate_fare</span> 2. Institutional Work
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('extraWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">rocket_launch</span> 3. Extra Proactive
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('fdpWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">school</span> 4. FDPs & Workshops
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('researchWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">biotech</span> 5. Research Workload
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('consultancyWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">handshake</span> 6. Consultancy
+                    </button>
+                </div>
+
+                <!-- Header Card -->
+                <div class="glass-card" style="padding: 24px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 1.6rem; color: var(--text-color); display: flex; align-items: center; gap: 10px;">
+                            <span class="material-symbols-outlined" style="color: #0284c7; font-size: 28px;">corporate_fare</span>
+                            Institutional Work & Central Responsibilities
+                        </h2>
+                        <p style="margin: 6px 0 0 0; color: var(--text-light); font-size: 0.95rem;">
+                            College-level commitments including IQAC/NAAC Lead, Examination Cell, Central Admissions, Hostel Administration, Anti-Ragging, and Campus Placement.
+                        </p>
+                    </div>
+                    <button type="button" class="btn-primary" onclick="openAllocateRoleModal('Institutional')" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; font-weight: 600; cursor: pointer; background: #0284c7;">
+                        <span class="material-symbols-outlined" style="font-size: 20px;">add_circle</span>
+                        + Allocate Institutional Role
+                    </button>
+                </div>
+
+                <!-- Summary KPI Grid -->
+                <div class="dashboard-grid" style="margin-bottom: 24px;">
+                    <div class="stat-card" style="border-left: 4px solid #0284c7; background: #ffffff;">
+                        <div class="stat-icon" style="background: #f0f9ff; color: #0284c7;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">corporate_fare</span>
+                        </div>
+                        <div>
+                            <h3 id="instKpiTotalHours" style="margin: 0; font-size: 1.8rem; color: #0369a1; font-weight: 700;">0.00 hrs</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.9rem; font-weight: 500;">Institutional Workload</p>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #047857; background: #ffffff;">
+                        <div class="stat-icon" style="background: #ecfdf5; color: #047857;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">checklist</span>
+                        </div>
+                        <div>
+                            <h3 id="instKpiTaskCount" style="margin: 0; font-size: 1.8rem; color: #064e3b; font-weight: 700;">0</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.9rem; font-weight: 500;">Allocated Institutional Tasks</p>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #b45309; background: #ffffff;">
+                        <div class="stat-icon" style="background: #fffbeb; color: #b45309;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">functions</span>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.1rem; color: #92400e; font-weight: 700;">Effort × Qty × Occ × Comp</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.85rem; font-weight: 500;">Standard Formula Applied</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table Panel -->
+                <div class="glass-panel" style="padding: 24px; background: #ffffff;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h3 style="margin: 0; color: #0f172a;">My Institutional Workload Breakdown</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.85rem;">Central college administration, accreditation, governance, and student welfare allocations.</p>
+                        </div>
+                        <span id="instWorkloadTableCountBadge" class="badge" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 4px 12px; border-radius: 12px; font-weight: 600; font-size: 0.85rem;">
+                            0 Tasks Active
+                        </span>
+                    </div>
+
+                    <div style="overflow-x: auto;">
+                        <table class="data-table" style="width: 100%; border-collapse: collapse; min-width: 850px;">
+                            <thead>
+                                <tr style="border-bottom: 2px solid var(--glass-border); text-align: left;">
+                                    <th style="padding: 12px 10px;">Task ID</th>
+                                    <th style="padding: 12px 10px;">Role</th>
+                                    <th style="padding: 12px 10px;">Responsibility / Task</th>
+                                    <th style="padding: 12px 10px;">Unit</th>
+                                    <th style="padding: 12px 10px;">Quantity</th>
+                                    <th style="padding: 12px 10px;">Std. Effort</th>
+                                    <th style="padding: 12px 10px;">Occurrences</th>
+                                    <th style="padding: 12px 10px;">Complexity</th>
+                                    <th style="padding: 12px 10px;">Calculated Workload</th>
+                                    <th style="padding: 12px 10px;">Remarks</th>
+                                    <th style="padding: 12px 10px; text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="facultyInstWorkloadList">
+                                <tr>
+                                    <td colspan="11" style="text-align: center; padding: 30px; color: var(--text-light);">
+                                        Loading institutional workload allocations...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 11. Extra Work Done Proactively Section -->
+            <section id="extraWorkload" class="content-section">
+                <!-- Domain Switcher Tabs -->
+                <div class="domain-tabs-nav" style="display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px;">
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('deptWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">account_tree</span> 1. Department Workload
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('instWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">corporate_fare</span> 2. Institutional Work
+                    </button>
+                    <button type="button" class="btn-primary" onclick="switchNavSection('extraWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600; background: #d97706;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">rocket_launch</span> 3. Extra Proactive
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('fdpWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">school</span> 4. FDPs & Workshops
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('researchWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">biotech</span> 5. Research Workload
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('consultancyWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">handshake</span> 6. Consultancy
+                    </button>
+                </div>
+
+                <!-- Header Card -->
+                <div class="glass-card" style="padding: 24px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 1.6rem; color: var(--text-color); display: flex; align-items: center; gap: 10px;">
+                            <span class="material-symbols-outlined" style="color: #d97706; font-size: 28px;">rocket_launch</span>
+                            Extra Work Done Proactively
+                        </h2>
+                        <p style="margin: 6px 0 0 0; color: var(--text-light); font-size: 0.95rem;">
+                            Proactive initiatives including mentoring technical clubs (Coding Club, Google DSC, ACM, CSI), organizing National Tech Fests, hackathons, college magazine/newsletters, and community outreach.
+                        </p>
+                    </div>
+                    <button type="button" class="btn-primary" onclick="openAllocateRoleModal('ExtraProactive')" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; font-weight: 600; cursor: pointer; background: #d97706;">
+                        <span class="material-symbols-outlined" style="font-size: 20px;">add_circle</span>
+                        + Allocate Proactive Work
+                    </button>
+                </div>
+
+                <!-- Summary KPI Grid -->
+                <div class="dashboard-grid" style="margin-bottom: 24px;">
+                    <div class="stat-card" style="border-left: 4px solid #d97706; background: #ffffff;">
+                        <div class="stat-icon" style="background: #fffbeb; color: #d97706;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">rocket_launch</span>
+                        </div>
+                        <div>
+                            <h3 id="extraKpiTotalHours" style="margin: 0; font-size: 1.8rem; color: #b45309; font-weight: 700;">0.00 hrs</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.9rem; font-weight: 500;">Proactive Workload</p>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #047857; background: #ffffff;">
+                        <div class="stat-icon" style="background: #ecfdf5; color: #047857;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">checklist</span>
+                        </div>
+                        <div>
+                            <h3 id="extraKpiTaskCount" style="margin: 0; font-size: 1.8rem; color: #064e3b; font-weight: 700;">0</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.9rem; font-weight: 500;">Allocated Proactive Tasks</p>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #b45309; background: #ffffff;">
+                        <div class="stat-icon" style="background: #fffbeb; color: #b45309;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">functions</span>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.1rem; color: #92400e; font-weight: 700;">Effort × Qty × Occ × Comp</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.85rem; font-weight: 500;">Standard Formula Applied</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table Panel -->
+                <div class="glass-panel" style="padding: 24px; background: #ffffff;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h3 style="margin: 0; color: #0f172a;">My Proactive Initiatives Breakdown</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.85rem;">Recognized faculty leadership beyond assigned curriculum.</p>
+                        </div>
+                        <span id="extraWorkloadTableCountBadge" class="badge" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; padding: 4px 12px; border-radius: 12px; font-weight: 600; font-size: 0.85rem;">
+                            0 Tasks Active
+                        </span>
+                    </div>
+
+                    <div style="overflow-x: auto;">
+                        <table class="data-table" style="width: 100%; border-collapse: collapse; min-width: 850px;">
+                            <thead>
+                                <tr style="border-bottom: 2px solid var(--glass-border); text-align: left;">
+                                    <th style="padding: 12px 10px;">Task ID</th>
+                                    <th style="padding: 12px 10px;">Role</th>
+                                    <th style="padding: 12px 10px;">Responsibility / Task</th>
+                                    <th style="padding: 12px 10px;">Unit</th>
+                                    <th style="padding: 12px 10px;">Quantity</th>
+                                    <th style="padding: 12px 10px;">Std. Effort</th>
+                                    <th style="padding: 12px 10px;">Occurrences</th>
+                                    <th style="padding: 12px 10px;">Complexity</th>
+                                    <th style="padding: 12px 10px;">Calculated Workload</th>
+                                    <th style="padding: 12px 10px;">Remarks</th>
+                                    <th style="padding: 12px 10px; text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="facultyExtraWorkloadList">
+                                <tr>
+                                    <td colspan="11" style="text-align: center; padding: 30px; color: var(--text-light);">
+                                        Loading proactive workload allocations...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 12. FDPs & Workshops Conducted & Attended Section -->
+            <section id="fdpWorkload" class="content-section">
+                <!-- Domain Switcher Tabs -->
+                <div class="domain-tabs-nav" style="display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px;">
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('deptWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">account_tree</span> 1. Department Workload
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('instWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">corporate_fare</span> 2. Institutional Work
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('extraWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">rocket_launch</span> 3. Extra Proactive
+                    </button>
+                    <button type="button" class="btn-primary" onclick="switchNavSection('fdpWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600; background: #059669;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">school</span> 4. FDPs & Workshops
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('researchWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">biotech</span> 5. Research Workload
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('consultancyWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">handshake</span> 6. Consultancy
+                    </button>
+                </div>
+
+                <!-- Header Card -->
+                <div class="glass-card" style="padding: 24px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 1.6rem; color: var(--text-color); display: flex; align-items: center; gap: 10px;">
+                            <span class="material-symbols-outlined" style="color: #059669; font-size: 28px;">school</span>
+                            FDPs & Workshops Conducted and Attended
+                        </h2>
+                        <p style="margin: 6px 0 0 0; color: var(--text-light); font-size: 0.95rem;">
+                            Coordinating and delivering AICTE/KTU approved FDPs, Short Term Training Programs (STTPs), technical hands-on bootcamps, and external expert keynote sessions.
+                        </p>
+                    </div>
+                    <button type="button" class="btn-primary" onclick="openAllocateRoleModal('FDP_Workshop')" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; font-weight: 600; cursor: pointer; background: #059669;">
+                        <span class="material-symbols-outlined" style="font-size: 20px;">add_circle</span>
+                        + Allocate FDP / Workshop
+                    </button>
+                </div>
+
+                <!-- Summary KPI Grid -->
+                <div class="dashboard-grid" style="margin-bottom: 24px;">
+                    <div class="stat-card" style="border-left: 4px solid #059669; background: #ffffff;">
+                        <div class="stat-icon" style="background: #ecfdf5; color: #059669;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">school</span>
+                        </div>
+                        <div>
+                            <h3 id="fdpKpiTotalHours" style="margin: 0; font-size: 1.8rem; color: #065f46; font-weight: 700;">0.00 hrs</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.9rem; font-weight: 500;">FDP / Workshop Workload</p>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #047857; background: #ffffff;">
+                        <div class="stat-icon" style="background: #ecfdf5; color: #047857;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">checklist</span>
+                        </div>
+                        <div>
+                            <h3 id="fdpKpiTaskCount" style="margin: 0; font-size: 1.8rem; color: #064e3b; font-weight: 700;">0</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.9rem; font-weight: 500;">Allocated Programs</p>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #b45309; background: #ffffff;">
+                        <div class="stat-icon" style="background: #fffbeb; color: #b45309;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">functions</span>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.1rem; color: #92400e; font-weight: 700;">Effort × Qty × Occ × Comp</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.85rem; font-weight: 500;">Standard Formula Applied</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table Panel -->
+                <div class="glass-panel" style="padding: 24px; background: #ffffff;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h3 style="margin: 0; color: #0f172a;">My FDPs & Workshops Breakdown</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.85rem;">Programs coordinated, sessions delivered, and professional development training attended.</p>
+                        </div>
+                        <span id="fdpWorkloadTableCountBadge" class="badge" style="background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; padding: 4px 12px; border-radius: 12px; font-weight: 600; font-size: 0.85rem;">
+                            0 Tasks Active
+                        </span>
+                    </div>
+
+                    <div style="overflow-x: auto;">
+                        <table class="data-table" style="width: 100%; border-collapse: collapse; min-width: 850px;">
+                            <thead>
+                                <tr style="border-bottom: 2px solid var(--glass-border); text-align: left;">
+                                    <th style="padding: 12px 10px;">Task ID</th>
+                                    <th style="padding: 12px 10px;">Role</th>
+                                    <th style="padding: 12px 10px;">Responsibility / Task</th>
+                                    <th style="padding: 12px 10px;">Unit</th>
+                                    <th style="padding: 12px 10px;">Quantity</th>
+                                    <th style="padding: 12px 10px;">Std. Effort</th>
+                                    <th style="padding: 12px 10px;">Occurrences</th>
+                                    <th style="padding: 12px 10px;">Complexity</th>
+                                    <th style="padding: 12px 10px;">Calculated Workload</th>
+                                    <th style="padding: 12px 10px;">Remarks</th>
+                                    <th style="padding: 12px 10px; text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="facultyFdpWorkloadList">
+                                <tr>
+                                    <td colspan="11" style="text-align: center; padding: 30px; color: var(--text-light);">
+                                        Loading FDP and workshop workload allocations...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 13. Own Research Workload Section -->
+            <section id="researchWorkload" class="content-section">
+                <!-- Domain Switcher Tabs -->
+                <div class="domain-tabs-nav" style="display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px;">
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('deptWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">account_tree</span> 1. Department Workload
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('instWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">corporate_fare</span> 2. Institutional Work
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('extraWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">rocket_launch</span> 3. Extra Proactive
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('fdpWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">school</span> 4. FDPs & Workshops
+                    </button>
+                    <button type="button" class="btn-primary" onclick="switchNavSection('researchWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600; background: #7c3aed;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">biotech</span> 5. Research Workload
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('consultancyWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">handshake</span> 6. Consultancy
+                    </button>
+                </div>
+
+                <!-- Header Card -->
+                <div class="glass-card" style="padding: 24px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 1.6rem; color: var(--text-color); display: flex; align-items: center; gap: 10px;">
+                            <span class="material-symbols-outlined" style="color: #7c3aed; font-size: 28px;">biotech</span>
+                            Own Research Workload & Guidance
+                        </h2>
+                        <p style="margin: 6px 0 0 0; color: var(--text-light); font-size: 0.95rem;">
+                            Funded research grants (PI/Co-PI), PhD & Master's project guidance (including MCA Final Project [23MCAN402]), SCI/Scopus journal publications, and patents filed/granted.
+                        </p>
+                    </div>
+                    <button type="button" class="btn-primary" onclick="openAllocateRoleModal('Research')" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; font-weight: 600; cursor: pointer; background: #7c3aed;">
+                        <span class="material-symbols-outlined" style="font-size: 20px;">add_circle</span>
+                        + Allocate Research Work
+                    </button>
+                </div>
+
+                <!-- Summary KPI Grid -->
+                <div class="dashboard-grid" style="margin-bottom: 24px;">
+                    <div class="stat-card" style="border-left: 4px solid #7c3aed; background: #ffffff;">
+                        <div class="stat-icon" style="background: #f5f3ff; color: #7c3aed;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">biotech</span>
+                        </div>
+                        <div>
+                            <h3 id="researchKpiTotalHours" style="margin: 0; font-size: 1.8rem; color: #6d28d9; font-weight: 700;">0.00 hrs</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.9rem; font-weight: 500;">Research Workload</p>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #047857; background: #ffffff;">
+                        <div class="stat-icon" style="background: #ecfdf5; color: #047857;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">checklist</span>
+                        </div>
+                        <div>
+                            <h3 id="researchKpiTaskCount" style="margin: 0; font-size: 1.8rem; color: #064e3b; font-weight: 700;">0</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.9rem; font-weight: 500;">Allocated Research Items</p>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #b45309; background: #ffffff;">
+                        <div class="stat-icon" style="background: #fffbeb; color: #b45309;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">functions</span>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.1rem; color: #92400e; font-weight: 700;">Effort × Qty × Occ × Comp</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.85rem; font-weight: 500;">Standard Formula Applied</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table Panel -->
+                <div class="glass-panel" style="padding: 24px; background: #ffffff;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h3 style="margin: 0; color: #0f172a;">My Research Workload Breakdown</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.85rem;">Scholarly research output, project guidance, patent development, and grant stewardship.</p>
+                        </div>
+                        <span id="researchWorkloadTableCountBadge" class="badge" style="background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; padding: 4px 12px; border-radius: 12px; font-weight: 600; font-size: 0.85rem;">
+                            0 Tasks Active
+                        </span>
+                    </div>
+
+                    <div style="overflow-x: auto;">
+                        <table class="data-table" style="width: 100%; border-collapse: collapse; min-width: 850px;">
+                            <thead>
+                                <tr style="border-bottom: 2px solid var(--glass-border); text-align: left;">
+                                    <th style="padding: 12px 10px;">Task ID</th>
+                                    <th style="padding: 12px 10px;">Role</th>
+                                    <th style="padding: 12px 10px;">Responsibility / Task</th>
+                                    <th style="padding: 12px 10px;">Unit</th>
+                                    <th style="padding: 12px 10px;">Quantity</th>
+                                    <th style="padding: 12px 10px;">Std. Effort</th>
+                                    <th style="padding: 12px 10px;">Occurrences</th>
+                                    <th style="padding: 12px 10px;">Complexity</th>
+                                    <th style="padding: 12px 10px;">Calculated Workload</th>
+                                    <th style="padding: 12px 10px;">Remarks</th>
+                                    <th style="padding: 12px 10px; text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="facultyResearchWorkloadList">
+                                <tr>
+                                    <td colspan="11" style="text-align: center; padding: 30px; color: var(--text-light);">
+                                        Loading research workload allocations...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 14. Consultancy & Technical Services Section -->
+            <section id="consultancyWorkload" class="content-section">
+                <!-- Domain Switcher Tabs -->
+                <div class="domain-tabs-nav" style="display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px;">
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('deptWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">account_tree</span> 1. Department Workload
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('instWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">corporate_fare</span> 2. Institutional Work
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('extraWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">rocket_launch</span> 3. Extra Proactive
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('fdpWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">school</span> 4. FDPs & Workshops
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="switchNavSection('researchWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">biotech</span> 5. Research Workload
+                    </button>
+                    <button type="button" class="btn-primary" onclick="switchNavSection('consultancyWorkload')" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600; background: #0891b2;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">handshake</span> 6. Consultancy
+                    </button>
+                </div>
+
+                <!-- Header Card -->
+                <div class="glass-card" style="padding: 24px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 1.6rem; color: var(--text-color); display: flex; align-items: center; gap: 10px;">
+                            <span class="material-symbols-outlined" style="color: #0891b2; font-size: 28px;">handshake</span>
+                            Consultancy & Technical Services
+                        </h2>
+                        <p style="margin: 6px 0 0 0; color: var(--text-light); font-size: 0.95rem;">
+                            Industrial software architecture, cloud migration, security penetration testing, corporate training, institutional revenue generation, and campus startup incubation.
+                        </p>
+                    </div>
+                    <button type="button" class="btn-primary" onclick="openAllocateRoleModal('Consultancy')" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; font-weight: 600; cursor: pointer; background: #0891b2;">
+                        <span class="material-symbols-outlined" style="font-size: 20px;">add_circle</span>
+                        + Allocate Consultancy Work
+                    </button>
+                </div>
+
+                <!-- Summary KPI Grid -->
+                <div class="dashboard-grid" style="margin-bottom: 24px;">
+                    <div class="stat-card" style="border-left: 4px solid #0891b2; background: #ffffff;">
+                        <div class="stat-icon" style="background: #ecfeff; color: #0891b2;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">handshake</span>
+                        </div>
+                        <div>
+                            <h3 id="consultancyKpiTotalHours" style="margin: 0; font-size: 1.8rem; color: #0e7490; font-weight: 700;">0.00 hrs</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.9rem; font-weight: 500;">Consultancy Workload</p>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #047857; background: #ffffff;">
+                        <div class="stat-icon" style="background: #ecfdf5; color: #047857;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">checklist</span>
+                        </div>
+                        <div>
+                            <h3 id="consultancyKpiTaskCount" style="margin: 0; font-size: 1.8rem; color: #064e3b; font-weight: 700;">0</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.9rem; font-weight: 500;">Allocated Contracts</p>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #b45309; background: #ffffff;">
+                        <div class="stat-icon" style="background: #fffbeb; color: #b45309;">
+                            <span class="material-symbols-outlined" style="font-size: 28px;">functions</span>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.1rem; color: #92400e; font-weight: 700;">Effort × Qty × Occ × Comp</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.85rem; font-weight: 500;">Standard Formula Applied</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table Panel -->
+                <div class="glass-panel" style="padding: 24px; background: #ffffff;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h3 style="margin: 0; color: #0f172a;">My Consultancy Workload Breakdown</h3>
+                            <p style="margin: 4px 0 0 0; color: #475569; font-size: 0.85rem;">Applied industrial services, testing, technical audit, and revenue contributions.</p>
+                        </div>
+                        <span id="consultancyWorkloadTableCountBadge" class="badge" style="background: #cffafe; color: #0e7490; border: 1px solid #a5f3fc; padding: 4px 12px; border-radius: 12px; font-weight: 600; font-size: 0.85rem;">
+                            0 Tasks Active
+                        </span>
+                    </div>
+
+                    <div style="overflow-x: auto;">
+                        <table class="data-table" style="width: 100%; border-collapse: collapse; min-width: 850px;">
+                            <thead>
+                                <tr style="border-bottom: 2px solid var(--glass-border); text-align: left;">
+                                    <th style="padding: 12px 10px;">Task ID</th>
+                                    <th style="padding: 12px 10px;">Role</th>
+                                    <th style="padding: 12px 10px;">Responsibility / Task</th>
+                                    <th style="padding: 12px 10px;">Unit</th>
+                                    <th style="padding: 12px 10px;">Quantity</th>
+                                    <th style="padding: 12px 10px;">Std. Effort</th>
+                                    <th style="padding: 12px 10px;">Occurrences</th>
+                                    <th style="padding: 12px 10px;">Complexity</th>
+                                    <th style="padding: 12px 10px;">Calculated Workload</th>
+                                    <th style="padding: 12px 10px;">Remarks</th>
+                                    <th style="padding: 12px 10px; text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="facultyConsultancyWorkloadList">
+                                <tr>
+                                    <td colspan="11" style="text-align: center; padding: 30px; color: var(--text-light);">
+                                        Loading consultancy workload allocations...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
         </main>
     </div>
 
     <!-- Modals -->
     <!-- New Chat Modal -->
     <div class="modal-overlay" id="newChatModal"
-        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px);">
-        <div class="glass-card" style="width: 100%; max-width: 500px; padding: 24px; position: relative;">
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.65); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(8px);">
+        <div style="background: #ffffff; width: 100%; max-width: 500px; padding: 28px; position: relative; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35);">
             <span id="closeNewChatModal"
-                style="position: absolute; top: 16px; right: 16px; font-size: 1.5rem; cursor: pointer; color: var(--text-dark);">&times;</span>
-            <h3>Start New Chat</h3>
-            <form id="newChatForm" style="margin-top: 16px;">
+                style="position: absolute; top: 16px; right: 16px; font-size: 1.6rem; cursor: pointer; color: #64748b; line-height: 1;">&times;</span>
+            <h3 style="margin: 0 0 16px 0; color: #0f172a;">Start New Chat</h3>
+            <form id="newChatForm">
                 <div class="form-group" style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Select User</label>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">Select User</label>
                     <select id="newChatUserSelect" required size="5"
-                        style="width: 100%; padding: 8px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);"></select>
+                        style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #1e293b; font-size: 0.95rem;"></select>
                 </div>
-                <button type="submit" class="btn-primary">Start Chat</button>
+                <button type="submit" class="btn-primary" style="width: 100%; padding: 12px; font-weight: 600;">Start Chat</button>
             </form>
         </div>
     </div>
 
     <!-- New Grievance Modal -->
     <div class="modal-overlay" id="newGrievanceModal"
-        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px);">
-        <div class="glass-card" style="width: 100%; max-width: 500px; padding: 24px; position: relative;">
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.65); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(8px);">
+        <div style="background: #ffffff; width: 100%; max-width: 520px; padding: 28px; position: relative; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35);">
             <span id="closeNewGrievanceModal"
-                style="position: absolute; top: 16px; right: 16px; font-size: 1.5rem; cursor: pointer; color: var(--text-dark);">&times;</span>
-            <h3>File New Grievance</h3>
-            <form id="newGrievanceForm" style="margin-top: 16px;">
+                style="position: absolute; top: 16px; right: 16px; font-size: 1.6rem; cursor: pointer; color: #64748b; line-height: 1;">&times;</span>
+            <h3 style="margin: 0 0 16px 0; color: #0f172a;">File New Grievance</h3>
+            <form id="newGrievanceForm">
                 <div class="form-group" style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Subject</label>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">Subject</label>
                     <input type="text" id="grivSubject" required placeholder="Brief subject..."
-                        style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                        style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #1e293b; font-size: 0.95rem;">
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Details</label>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">Details</label>
                     <textarea id="grivDetails" rows="5" required placeholder="Describe your grievance in detail..."
-                        style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);"></textarea>
+                        style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #1e293b; font-size: 0.95rem;"></textarea>
                 </div>
-                <button type="submit" class="btn-primary" style="width: 100%;">Submit Grievance</button>
+                <button type="submit" class="btn-primary" style="width: 100%; padding: 12px; font-weight: 600;">Submit Grievance</button>
             </form>
         </div>
     </div>
 
     <!-- View Grievance Modal -->
     <div class="modal-overlay" id="viewGrievanceModal"
-        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px);">
-        <div class="glass-card" style="width: 100%; max-width: 500px; padding: 24px; position: relative;">
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.65); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(8px);">
+        <div style="background: #ffffff; width: 100%; max-width: 520px; padding: 28px; position: relative; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35);">
             <span id="closeViewGrievanceModal"
-                style="position: absolute; top: 16px; right: 16px; font-size: 1.5rem; cursor: pointer; color: var(--text-dark);">&times;</span>
-            <h3>Grievance Status</h3>
-            <div id="viewGrievanceDetails" style="margin-top: 16px;"></div>
+                style="position: absolute; top: 16px; right: 16px; font-size: 1.6rem; cursor: pointer; color: #64748b; line-height: 1;">&times;</span>
+            <h3 style="margin: 0 0 16px 0; color: #0f172a;">Grievance Status</h3>
+            <div id="viewGrievanceDetails" style="margin-top: 16px; color: #1e293b;"></div>
+        </div>
+    </div>
+
+    <!-- Allocate Workload Role Modal (Multi-Domain) -->
+    <div class="modal-overlay" id="allocateDeptRoleModal"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.65); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(8px);">
+        <div style="background: #ffffff; width: 100%; max-width: 680px; padding: 30px; position: relative; max-height: 90vh; overflow-y: auto; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);">
+            <span id="closeAllocateDeptRoleModal" onclick="closeDeptModal()"
+                style="position: absolute; top: 18px; right: 20px; font-size: 1.8rem; cursor: pointer; color: #64748b; line-height: 1; transition: color 0.2s;">&times;</span>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                <span class="material-symbols-outlined" id="modalDomainIcon" style="color: #4338ca; font-size: 28px;">account_tree</span>
+                <h3 id="modalDomainTitle" style="margin: 0; font-size: 1.35rem; color: #0f172a;">Allocate Faculty Workload Role & Task</h3>
+            </div>
+            <p id="modalDomainDesc" style="color: #475569; font-size: 0.9rem; margin-top: 0; margin-bottom: 20px; line-height: 1.45;">
+                Select your assigned workload category, role and responsibility task. Standard effort, occurrences, and complexity factor will be preloaded automatically according to the institutional responsibility matrix.
+            </p>
+
+            <form id="allocateDeptRoleForm" style="display: flex; flex-direction: column; gap: 18px;">
+                <!-- Category Select -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 700; font-size: 0.92rem; color: #1e293b;">1. Select Workload Domain / Category</label>
+                    <select id="workloadCategorySelect" required style="width: 100%; padding: 11px 14px; border-radius: var(--border-radius-sm); border: 2px solid #cbd5e1; background: #f8fafc; color: #0f172a; font-weight: 600; font-size: 0.95rem;">
+                        <option value="Department">🏢 Department Workload</option>
+                        <option value="Institutional">🏛️ Institutional Work</option>
+                        <option value="ExtraProactive">🚀 Extra Work Done Proactively</option>
+                        <option value="FDP_Workshop">🎓 FDPs & Workshops Conducted/Attended</option>
+                        <option value="Research">🔬 Own Research Workload</option>
+                        <option value="Consultancy">💼 Consultancy & Technical Services</option>
+                    </select>
+                </div>
+
+                <!-- Role Select -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.92rem; color: #1e293b;" id="lblSelectRole">2. Select Assigned Role</label>
+                    <select id="deptRoleSelect" required style="width: 100%; padding: 11px 14px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 0.95rem;">
+                        <option value="">-- Choose Assigned Role --</option>
+                    </select>
+                    <div id="roleSummaryBadge" style="margin-top: 8px; font-size: 0.85rem; color: #1e40af; background: #eff6ff; border: 1px solid #bfdbfe; padding: 8px 12px; border-radius: 8px; line-height: 1.45; display: none;"></div>
+                </div>
+
+                <!-- Task Select -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.92rem; color: #1e293b;" id="lblSelectTask">3. Select Measurable Task</label>
+                    <select id="deptTaskSelect" required disabled style="width: 100%; padding: 11px 14px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 0.95rem;">
+                        <option value="">-- Select a role first --</option>
+                    </select>
+                </div>
+
+                <!-- Parameters Grid -->
+                <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px;">
+                    <div>
+                        <label style="display: block; font-size: 0.75rem; color: #475569; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 6px;">Work Unit</label>
+                        <span id="deptWorkUnitDisplay" style="font-size: 1.05rem; font-weight: 700; color: #0284c7; display: block; padding-top: 4px;">-</span>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.75rem; color: #475569; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 6px;">Std. Effort (hrs/unit)</label>
+                        <input type="number" step="0.01" id="deptStdEffort" readonly style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1.5px solid #cbd5e1; background: #e2e8f0; color: #0f172a; font-weight: 700; font-size: 0.95rem;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.75rem; color: #475569; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 6px;">Occurrences / Sem</label>
+                        <input type="number" id="deptOccurrences" required min="1" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-weight: 600; font-size: 0.95rem;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.75rem; color: #475569; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 6px;">Complexity Factor</label>
+                        <input type="number" step="0.05" id="deptComplexity" required min="0.5" max="3" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-weight: 600; font-size: 0.95rem;">
+                    </div>
+                </div>
+
+                <!-- Quantity and Remarks -->
+                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 14px;">
+                    <div class="form-group" style="margin: 0;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.92rem; color: #1e293b;">Quantity / Units</label>
+                        <input type="number" step="0.1" id="deptQuantity" required min="0.1" value="1" placeholder="e.g. 45" style="width: 100%; padding: 11px 14px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-weight: 600; font-size: 0.95rem;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.92rem; color: #1e293b;">Remarks / Detail Note</label>
+                        <input type="text" id="deptRemarks" placeholder="e.g. Advisees / Session details" style="width: 100%; padding: 11px 14px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 0.95rem;">
+                    </div>
+                </div>
+
+                <!-- Live Calculation Preview Card -->
+                <div style="background: #ecfdf5; border: 1.5px solid #a7f3d0; border-radius: 12px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span style="font-size: 0.85rem; color: #065f46; font-weight: 600; display: block; margin-bottom: 2px;">Formula: Effort × Quantity × Occurrences × Complexity</span>
+                        <span id="deptFormulaBreakdown" style="font-size: 0.92rem; color: #047857; font-family: monospace; font-weight: 600;">0 × 0 × 0 × 0</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 0.75rem; text-transform: uppercase; color: #065f46; font-weight: 700; letter-spacing: 0.5px; display: block;">Calculated Workload</span>
+                        <span id="deptLiveWorkloadHours" style="font-size: 1.7rem; font-weight: 800; color: #047857;">0.00 hrs</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 14px; margin-top: 4px;">
+                    <button type="button" id="btnCancelDeptModal" class="btn-secondary" onclick="closeDeptModal()" style="flex: 1; padding: 12px; font-weight: 600;">Cancel</button>
+                    <button type="submit" id="btnSaveDeptWorkload" class="btn-primary" style="flex: 2; padding: 12px; font-weight: 600; background-color: #0b7a75;">Save Allocation</button>
+                </div>
+            </form>
         </div>
     </div>
 
     <!-- Add Class Modal -->
-    <div class="modal-overlay" id="addClassModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px);">
-        <div class="glass-card" style="width: 100%; max-width: 500px; padding: 24px; position: relative;">
-            <span id="closeAddClassModal" style="position: absolute; top: 16px; right: 16px; font-size: 1.5rem; cursor: pointer; color: var(--text-dark);">&times;</span>
-            <h3>Add New Class</h3>
-            <form id="addClassForm" style="margin-top: 16px; display: flex; flex-direction: column; gap: 12px; max-height: 70vh; overflow-y: auto; padding-right: 8px;">
+    <div class="modal-overlay" id="addClassModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.65); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(8px);">
+        <div style="background: #ffffff; width: 100%; max-width: 560px; padding: 28px; position: relative; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35);">
+            <span id="closeAddClassModal" style="position: absolute; top: 16px; right: 16px; font-size: 1.6rem; cursor: pointer; color: #64748b; line-height: 1;">&times;</span>
+            <h3 style="margin: 0 0 8px 0; color: #0f172a;">Add New Class</h3>
+            <p style="margin: 0 0 16px 0; font-size: 0.88rem; color: #64748b;">Select from the TKMCE MCA Curriculum 2023 or enter custom class details.</p>
+            
+            <form id="addClassForm" style="display: flex; flex-direction: column; gap: 14px; max-height: 70vh; overflow-y: auto; padding-right: 8px;">
+                <!-- Fast Preset Picker: MCA Curriculum 2023 -->
+                <div class="form-group" style="margin: 0; background: #f0fdf4; border: 1.5px solid #bbf7d0; padding: 12px; border-radius: 8px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 700; color: #166534; font-size: 0.88rem;">✨ Quick-Fill: MCA Curriculum 2023 Scheme</label>
+                    <select id="acMcaPresetSelect" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1.5px solid #86efac; background: #ffffff; color: #166534; font-weight: 600; font-size: 0.9rem;">
+                        <option value="">-- Choose MCA Course from Catalog --</option>
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+
                 <div class="form-group" style="margin: 0;">
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Role / In-Charge Type</label>
-                    <select id="acRole" required style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #1e293b;">Role / In-Charge Type</label>
+                    <select id="acRole" required style="width: 100%; padding: 10px 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 0.95rem;">
                         <option value="Theory">Theory In-Charge</option>
                         <option value="Lab">Lab In-Charge</option>
                         <option value="Project">Project In-Charge</option>
@@ -548,28 +1501,28 @@
                 </div>
                 
                 <div class="form-group" style="margin: 0;">
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Program Name</label>
-                    <input type="text" id="acProgram" required placeholder="e.g. B.Tech Computer Science" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #1e293b;">Program Name</label>
+                    <input type="text" id="acProgram" required placeholder="e.g. Master of Computer Applications (MCA 2023 Scheme)" style="width: 100%; padding: 10px 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 0.95rem;">
                 </div>
 
                 <div class="form-group" style="margin: 0;">
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Subject Name</label>
-                    <input type="text" id="acSubjectName" required placeholder="e.g. Data Structures" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #1e293b;">Subject Name</label>
+                    <input type="text" id="acSubjectName" required placeholder="e.g. Data Structures" style="width: 100%; padding: 10px 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 0.95rem;">
                 </div>
 
                 <div class="form-group" style="margin: 0;">
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Semester</label>
-                    <input type="number" id="acSemester" required min="1" max="10" placeholder="e.g. 3" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #1e293b;">Semester</label>
+                    <input type="number" id="acSemester" required min="1" max="10" placeholder="e.g. 3" style="width: 100%; padding: 10px 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 0.95rem;">
                 </div>
 
                 <div class="form-group" style="margin: 0;">
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Number of students in class</label>
-                    <input type="number" id="acStudentsClass" value="60" min="1" required style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #1e293b;">Number of students in class</label>
+                    <input type="number" id="acStudentsClass" value="60" min="1" required style="width: 100%; padding: 10px 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 0.95rem;">
                 </div>
 
                 <div class="form-group" style="margin: 0;">
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Course Type</label>
-                    <select id="acCourseType" required style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #1e293b;">Course Type</label>
+                    <select id="acCourseType" required style="width: 100%; padding: 10px 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 0.95rem;">
                         <option value="Theory course without ESE|2-0-0-0">Theory course without ESE [2-0-0-0]</option>
                         <option value="Theory course embedded with tutorial|3-1-0-0">Theory course embedded with tutorial [3-1-0-0]</option>
                         <option value="Theory course embedded with tutorial & practical|2-1-2-0">Theory course embedded with tutorial & practical [2-1-2-0]</option>
@@ -582,49 +1535,60 @@
                 </div>
 
                 <div class="form-group" id="labStudentsContainer" style="margin: 0; display: none;">
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Number of students to handle in lab</label>
-                    <input type="number" id="acStudentsLab" value="0" min="0" placeholder="e.g. 30" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #1e293b;">Number of students to handle in lab</label>
+                    <input type="number" id="acStudentsLab" value="0" min="0" placeholder="e.g. 30" style="width: 100%; padding: 10px 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 0.95rem;">
                 </div>
 
                 <div class="form-group" id="labModContainer" style="margin: 0; display: none;">
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Modifications made to lab (new/revised experiments, rubrics)?</label>
-                    <select id="acLabModification" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #1e293b;">Modifications made to lab (new/revised experiments, rubrics)?</label>
+                    <select id="acLabModification" style="width: 100%; padding: 10px 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 0.95rem;">
                         <option value="No">No</option>
                         <option value="Yes">Yes</option>
                     </select>
                 </div>
 
                 <div class="form-group" id="projectStudentsContainer" style="margin: 0; display: none;">
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Number of students to manage for project</label>
-                    <input type="number" id="acStudentsProject" value="0" min="0" placeholder="e.g. 10" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #1e293b;">Number of students to manage for project</label>
+                    <input type="number" id="acStudentsProject" value="0" min="0" placeholder="e.g. 10" style="width: 100%; padding: 10px 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 0.95rem;">
                 </div>
 
                 <div class="form-group" style="margin: 0;">
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Prior experience teaching this subject (>0 semesters)?</label>
-                    <select id="acPriorExperience" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--glass-border); background: var(--input-bg);">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600; color: #1e293b;">Prior experience teaching this subject (>0 semesters)?</label>
+                    <select id="acPriorExperience" style="width: 100%; padding: 10px 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 0.95rem;">
                         <option value="No">No</option>
                         <option value="Yes">Yes</option>
                     </select>
                 </div>
                 
-                <button type="submit" class="btn-primary" style="margin-top: 10px;">Save Class</button>
+                <button type="submit" class="btn-primary" style="margin-top: 10px; padding: 12px; font-weight: 600;">Save Class</button>
             </form>
         </div>
     </div>
 
     <script src="js/faculty.js"></script>
     <script>
-        // Inline script to handle modal overlay display toggling for faculty dashboard since we removed inline active classes
-        function showModal(id) { document.getElementById(id).style.display = 'flex'; }
-        function hideModal(id) { document.getElementById(id).style.display = 'none'; }
+        // Universal modal helpers
+        function showModal(id) { 
+            const el = document.getElementById(id);
+            if (el) {
+                el.style.display = 'flex';
+                el.classList.add('active');
+            }
+        }
+        function hideModal(id) { 
+            const el = document.getElementById(id);
+            if (el) {
+                el.style.display = 'none';
+                el.classList.remove('active');
+            }
+        }
 
-        document.getElementById('btnNewGrievance').addEventListener('click', () => showModal('newGrievanceModal'));
-        document.getElementById('closeNewGrievanceModal').addEventListener('click', () => hideModal('newGrievanceModal'));
-
-        document.getElementById('btnNewChat').addEventListener('click', () => showModal('newChatModal'));
-        document.getElementById('closeNewChatModal').addEventListener('click', () => hideModal('newChatModal'));
-
-        document.getElementById('closeViewGrievanceModal').addEventListener('click', () => hideModal('viewGrievanceModal'));
+        // General Modal Close & Open Buttons
+        document.getElementById('btnNewGrievance')?.addEventListener('click', () => showModal('newGrievanceModal'));
+        document.getElementById('closeNewGrievanceModal')?.addEventListener('click', () => hideModal('newGrievanceModal'));
+        document.getElementById('btnNewChat')?.addEventListener('click', () => showModal('newChatModal'));
+        document.getElementById('closeNewChatModal')?.addEventListener('click', () => hideModal('newChatModal'));
+        document.getElementById('closeViewGrievanceModal')?.addEventListener('click', () => hideModal('viewGrievanceModal'));
 
         const btnAddClass = document.getElementById('btnAddClass');
         if (btnAddClass) {
@@ -635,31 +1599,18 @@
             closeAddClassModal.addEventListener('click', () => hideModal('addClassModal'));
         }
 
-        // Monkey patch faculty.js modal toggling to use display instead of classList
-        const originalClassListAdd = DOMTokenList.prototype.add;
-        const originalClassListRemove = DOMTokenList.prototype.remove;
-
-        // This is a quick fix to make faculty.js work with inline display toggle
-        // without rewriting the entire faculty.js again.
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.attributeName === 'class') {
-                    const target = mutation.target;
-                    if (target.classList.contains('modal-overlay')) {
-                        if (target.classList.contains('active')) {
-                            target.style.display = 'flex';
-                        } else {
-                            target.style.display = 'none';
-                        }
-                    }
-                }
-            });
+        // Workload Allocation Modal Controls
+        document.getElementById('btnOpenAllocateDeptModal')?.addEventListener('click', () => {
+            if (window.openAllocateRoleModal) window.openAllocateRoleModal('Department');
         });
-
-        document.querySelectorAll('.modal-overlay').forEach(el => {
-            observer.observe(el, { attributes: true });
+        document.getElementById('closeAllocateDeptRoleModal')?.addEventListener('click', () => {
+            if (window.closeDeptModal) window.closeDeptModal();
+        });
+        document.getElementById('btnCancelDeptModal')?.addEventListener('click', () => {
+            if (window.closeDeptModal) window.closeDeptModal();
         });
     </script>
+
 </body>
 
 </html>
