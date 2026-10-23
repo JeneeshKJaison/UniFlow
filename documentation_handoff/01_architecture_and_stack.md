@@ -1,237 +1,196 @@
-# UniFlow — System Architecture & Verified Technology Stack
+# UniFlow — Verified Architecture & Technology Stack (v2)
 
-## 1. Architectural Model & Multi-Tier Topology
+> **Document Status:** VERIFIED AGAINST SOURCE CODE  
+> **Audit Target:** Git Commit `6a2fff722c3d8cab187c5e95882cd1c894d185c6` (Branch: `main`)  
+> **Working Tree State:** `backend/.env` modified (line addition for `DB_PASSWORD`), all other source files identical to HEAD.  
+> **Auditor Role:** Senior Software Architect & Code Auditor  
+> **Date of Audit:** October 23, 2026  
 
-UniFlow is structured according to a classical **3-Tier Enterprise Web Architecture**, separating concerns across presentation, business logic, and relational persistence.
+---
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            PRESENTATION TIER                                │
-│   [Super Admin Console]    [HOD Dashboard]    [Faculty Portal]    [Student] │
-│   - Technologies: HTML5, CSS3, Vanilla JavaScript ES6+                     │
-│   - Design System: Custom Glassmorphism (CSS custom properties / tokens)    │
-│   - Analytics Engine: Chart.js 4.4.x (CDN loaded)                           │
-│   - State Management: LocalStorage (Tokens, User session, Admin fallback)   │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │ HTTPS / JSON REST API calls
-                                       │ Authorization: Bearer <JWT>
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            APPLICATION TIER                                 │
-│   - Runtime & Framework: Node.js (v24.20.0) + Express 5.2.1                 │
-│   - Middleware: cors, express.json(limit: 50mb), authMiddleware             │
-│   - Core Business Logic Controllers:                                        │
-│     * authController.js (Credential verification, token issuance)           │
-│     * workloadController.js (HOD suggest, assign, L-T-P-J academic units)   │
-│     * facultyController.js (Task updates, deliverables, student collision)  │
-│     * studentController.js (Dashboard stats, courses, online turn-in)       │
-│   - File Storage: Local filesystem static directory (`backend/uploads/`)    │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │ PostgreSQL Connection Pool (pg-pool)
-                                       │ Port 5432 / TCP
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                             DATABASE TIER                                   │
-│   - Database Engine: PostgreSQL 16+ (Relational, ACID compliant)            │
-│   - Schema Scope: 15 Tables (10 Core Operational + 5 Academic Analytics)    │
-│   - Query Strategies: Parameterized SQL, JSON Aggregation (json_agg),        │
-│     Time-Series Scanners (generate_series), Atomic Transactions (BEGIN/COMMIT)
-└─────────────────────────────────────────────────────────────────────────────┘
+## 1. Technology Stack Inventory
+
+### 1.1 Client-Side (Frontend)
+
+UniFlow's user interface is structured as a multi-page web application using standard vanilla web technologies:
+- **Markup:** Semantic HTML5 (`UI/index.html`, `UI/hod/dashboard.html`, `UI/faculty/dashboard.html`, `UI/student/dashboard.html`, `UI/admin/dashboard.html`).
+- **Styling:** Vanilla CSS3 with CSS Custom Properties (design tokens defined in `UI/css/theme.css`, `UI/css/login.css`, `UI/hod/css/hod.css`, `UI/student/css/student.css`, `UI/admin/css/admin.css`). Glassmorphism aesthetic with frosted backdrops (`backdrop-filter: blur(12px)`).
+- **Typography & Icons:**
+  - Google Fonts: `'Inter'` (Sans-serif font family: `400`, `500`, `600`, `700`, `800`).
+  - Google Material Symbols: `material-symbols-outlined` (imported via Google CDN).
+- **Visualization:** `Chart.js` (loaded via CDN `https://cdn.jsdelivr.net/npm/chart.js` in `UI/hod/dashboard.html:9` and `UI/faculty/dashboard.html:10`). Used to render animated bar charts for faculty workload analytics.
+- **Client Networking:** Native `window.fetch()` API communicating via JSON over HTTP.
+- **Client State Storage:** Browser `localStorage` (used for `uniflow_token`, `uniflow_currentUser`, and mocked state for timetable, admin tables, chat, and grievances).
+
+#### Design Token System (`UI/css/theme.css:1-40`)
+```css
+:root {
+  --primary-color: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-light: #e0e7ff;
+  --secondary-color: #06b6d4;
+  --accent-color: #8b5cf6;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --danger-color: #ef4444;
+  --info-color: #3b82f6;
+  --bg-dark: #0f172a;
+  --surface-dark: #1e293b;
+  --card-dark: rgba(30, 41, 59, 0.7);
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-light: #64748b;
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+}
 ```
 
 ---
 
-## 2. Verified Technology Stack Specification
+### 1.2 Server-Side (Backend)
 
-Every library, runtime, and package in UniFlow has been audited directly against the workspace files:
+The server runs on Node.js utilizing Express 5:
+- **Runtime:** Node.js (tested and executed on Node v25.0.0).
+- **Framework:** Express.js `^5.2.1` (`backend/package.json:19`).
+- **Architecture Pattern:** Controller-Service-Repository style using Express routers, controller functions, and direct PostgreSQL parameterized SQL queries.
 
-### 2.1 Presentation Tier (Frontend)
-- **Markup & Semantics:** HTML5 (`UI/index.html`, `UI/admin/dashboard.html`, `UI/hod/dashboard.html`, `UI/faculty/dashboard.html`, `UI/student/dashboard.html`).
-- **Styling Architecture:** Vanilla CSS3 with zero utility frameworks (no Tailwind CSS, no Bootstrap).
-  - *Design Paradigm:* Glassmorphism Design System.
-  - *CSS Custom Tokens:* Defined in `:root` (`--primary-color: #0b7a75`, `--accent-teal: #14b8a6`, `--glass-bg: rgba(255, 255, 255, 0.08)`, `--glass-border: rgba(255, 255, 255, 0.15)`, `--text-light: #94a3b8`).
-  - *Responsiveness:* Fluid CSS Grid and Flexbox layouts.
-- **Client-Side Scripting:** Vanilla JavaScript (ES6+ standard).
-  - No frontend frameworks (no React, Angular, Vue, or Next.js).
-  - Direct DOM manipulation via `document.getElementById`, `document.querySelectorAll`, and event listeners.
-- **Data Visualization Library:** **Chart.js** (v4.x loaded via CDN in `UI/hod/dashboard.html`):
-  `<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>`
-  - Used in HOD dashboard for animated bar graphs displaying `grand_total_workload_units` and drill-down metrics.
-- **Typography & Iconography:**
-  - Google Fonts: `Inter` (sans-serif typography).
-  - Google Material Symbols Outlined (`<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />`).
+#### Dependency Audit (`backend/package.json` vs Active Code Usage)
+| Package | Declared Version | Purpose in Code | Active Evidence in Code |
+| :--- | :--- | :--- | :--- |
+| `express` | `^5.2.1` | HTTP routing, middleware pipeline, static serving | `backend/src/server.js:1` (`require('express')`) |
+| `cors` | `^2.8.6` | Cross-Origin Resource Sharing enabling browser requests | `backend/src/server.js:2` (`app.use(cors())`) |
+| `dotenv` | `^17.4.2` | Loading environment variables from `.env` | `backend/src/server.js:4`, `backend/src/config/db.js:2` |
+| `pg` | `^8.23.0` | PostgreSQL client connection pooling | `backend/src/config/db.js:1` (`const { Pool } = require('pg')`) |
+| `jsonwebtoken` | `^9.0.3` | JWT creation and cryptographic verification | `backend/src/controllers/authController.js:2`, `backend/src/middleware/authMiddleware.js:1` |
+| `bcryptjs` | `^3.0.3` | Password hashing (salt rounds = 10) & verification | `backend/src/controllers/authController.js:1`, `backend/seed.js:1` |
+| `nodemon` | `^3.1.14` | Development auto-reload (devDependency) | `backend/package.json:8` (`npm run dev`) |
 
-### 2.2 Application Tier (Backend)
-- **Runtime Environment:** Node.js (audited local runtime version: `v24.20.0`).
-- **Web Framework:** Express 5.x (`"express": "^5.2.1"` in `backend/package.json`).
-- **Middleware Pipeline (`backend/src/server.js`):**
-  1. `cors()`: Cross-Origin Resource Sharing enabled for cross-origin requests from Live Server (`http://localhost:5500` $\rightarrow$ `http://localhost:5000`).
-  2. `express.json({ limit: '50mb' })`: Extended JSON body parsing to accommodate base64 deliverable file uploads.
-  3. `express.urlencoded({ extended: true, limit: '50mb' })`: URL-encoded payload handling.
-  4. `express.static(uploadsDir)`: Static asset serving mounted at `/uploads` routing to `backend/uploads/`.
-  5. Route dispatchers mounted at:
-     - `/api/auth` $\rightarrow$ `authRoutes.js`
-     - `/api/workload` $\rightarrow$ `workloadRoutes.js`
-     - `/api/faculty` $\rightarrow$ `facultyRoutes.js`
-     - `/api/student` $\rightarrow$ `studentRoutes.js`
-- **Authentication & Cryptography:**
-  - `jsonwebtoken` (`^9.0.3`): Signs and verifies stateless HS256 tokens.
-  - `bcryptjs` (`^3.0.3`): Password hashing using 10 salt rounds (`bcrypt.genSalt(10)`).
+*Finding:* 100% of declared packages are actively utilized. There are zero dead dependencies in `backend/package.json`.
 
-### 2.3 Persistence Tier (Database)
-- **Database Engine:** PostgreSQL 16+.
-- **Database Client Driver:** `pg` (`^8.23.0`).
-- **Connection Architecture:** Managed connection pooling via `pg.Pool` in `backend/src/config/db.js`:
+---
+
+### 1.3 Database Subsystem
+
+- **Database Engine:** PostgreSQL 16+ running locally on port `5432`.
+- **Driver:** `pg` (node-postgres) Connection Pool (`backend/src/config/db.js:4-10`).
+- **Connection Configuration:**
   ```javascript
   const pool = new Pool({
-      user: process.env.DB_USER || 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      database: process.env.DB_NAME || 'uniflow',
-      password: process.env.DB_PASSWORD,
-      port: process.env.DB_PORT || 5432,
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      database: process.env.DB_NAME,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD
   });
   ```
-
-### 2.4 Declared Dependencies Audit
-
-| Package Name | Declared in `package.json` | Actually Imported & Used | Critical Role in System |
-| :--- | :---: | :---: | :--- |
-| `express` | `^5.2.1` | **YES** | HTTP REST server, routing, static file server. |
-| `pg` | `^8.23.0` | **YES** | PostgreSQL client connection pooling & query execution. |
-| `jsonwebtoken` | `^9.0.3` | **YES** | JWT token generation (`sign`) and middleware validation (`verify`). |
-| `bcryptjs` | `^3.0.3` | **YES** | Password hashing during seeding and authentication comparison. |
-| `cors` | `^2.8.6` | **YES** | Enables API requests across different origins (ports 5500 and 5000). |
-| `dotenv` | `^17.4.2` | **YES** | Environment variable injection from `backend/.env`. |
-| `nodemon` (dev) | `^3.1.14` | **YES** | Automatic server restart during backend development. |
+- **Error Handling:** Connection error listener registered on `pool.on('error', ...)` to prevent unhandled node crash.
+- **Query Parameterization:** All dynamic inputs are passed as parameterized `$1, $2, ...` placeholders to prevent SQL injection.
 
 ---
 
-## 3. Request Lifecycle & Authentication Flow
+## 2. Server Startup & Middleware Pipeline
 
-### 3.1 Authentication Handshake (`POST /api/auth/login`)
-1. **Client Submission:** User enters email and plaintext password in `UI/index.html`.
-2. **Controller Interception (`authController.js`):**
-   - Query: `SELECT * FROM users WHERE email = $1`.
-   - Hash Verification: `bcrypt.compare(password, user.password_hash)`.
-   - Token Generation: `jwt.sign({ userId: user.id, email: user.email, role: user.role, isHod: user.is_hod }, JWT_SECRET, { expiresIn: '24h' })`.
-3. **Client Session Storage:**
-   - Client stores token in `localStorage.setItem('uniflow_token', token)`.
-   - Client stores user profile in `localStorage.setItem('uniflow_currentUser', JSON.stringify(user))`.
-   - Redirects to designated dashboard (`UI/admin/dashboard.html`, `UI/hod/dashboard.html`, `UI/faculty/dashboard.html`, or `UI/student/dashboard.html`).
-
-### 3.2 Route Guarding (`authMiddleware.js`)
-Protected routes execute `authenticateToken` middleware:
-1. Extracts `authHeader = req.headers['authorization']`.
-2. Token extracted via regex or split: `authHeader.split(' ')[1]`.
-3. Validated via `jwt.verify(token, JWT_SECRET)`.
-4. Decoded payload attached to request object: `req.user = user`.
-5. Returns `401 Unauthorized` if token is missing, or `403 Forbidden` if signature is invalid or expired.
+The HTTP server lifecycle is initiated from `backend/src/server.js`:
 
 ```
-[ Browser UI ] ──(Request + Bearer Token)──► [ Express Router ]
-                                                     │
-                                            [ authMiddleware ]
-                                             ├─ Invalid/Missing ──► HTTP 401/403
-                                             └─ Valid Signature
-                                                     │
-                                            [ Controller Logic ]
-                                                     │
-                                            [ PostgreSQL Query ]
-                                                     │
-                                            [ JSON Response ] ────► [ Client UI ]
+Incoming HTTP Request
+         │
+         ▼
+[ cors() ] (Allow all origins)
+         │
+         ▼
+[ express.json() ] (Strict 100 KB body limit)
+         │
+         ▼
+[ express.static('../../UI') ] (Serves HTML, CSS, JS directly)
+         │
+         ▼
+[ Route Dispatcher ]
+   ├── /api/auth     ──► authRoutes.js     (Public: login)
+   ├── /api/workload ──► workloadRoutes.js (HOD & Academic Workload)
+   ├── /api/faculty  ──► facultyRoutes.js  (Faculty tasks & student assignments)
+   └── /api/student  ──► studentRoutes.js  (Student portal & submissions)
 ```
+
+### 2.1 Startup Automatic Migrations & Linus Cleanup (`server.js:41-64`)
+When `node src/server.js` boots:
+1. Executes `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS faculty_remark TEXT, attachment_filename VARCHAR(255), attachment_url TEXT, completed_at TIMESTAMP;` (adds legacy columns).
+2. Clears tasks for Linus Torvalds: `DELETE FROM tasks WHERE assigned_to IN (SELECT id FROM users WHERE email = 'linus@uniflow.edu' OR name ILIKE '%Linus%');`.
+3. Calls `initWorkloadTables()` from `backend/src/config/initWorkloadTables.js`, which ensures tables 11 through 18 exist, drops foreign key constraints on multi-domain tables to support flexible role IDs, and seeds standard master catalog data across all 6 categories.
 
 ---
 
-## 4. Deliverable File Upload Architecture
+## 3. How to Install, Configure, and Run
 
-UniFlow implements a deliverable file submission subsystem for faculty task deliverables (`POST /api/faculty/tasks/:id/deliverable`):
+### 3.1 Prerequisites
+1. **Node.js** (v18.0.0 or higher; v25.0.0 tested)
+2. **PostgreSQL** (v14+; port 5432)
 
-1. **Client-Side File Ingestion:** In `UI/faculty/js/faculty.js`, when a faculty member selects a file (PDF, DOCX, ZIP, image) in the modal, JavaScript reads the file using `FileReader.readAsDataURL(file)`.
-2. **Payload Serialization:** The file is encoded into a Base64 data URI string and included in the JSON payload:
-   ```json
-   {
-       "status": "completed",
-       "faculty_remark": "Completed lecture notes and exam solutions.",
-       "filename": "OS_Exam_Solutions.pdf",
-       "file_data": "data:application/pdf;base64,JVBERi0xLjQK..."
-   }
-   ```
-3. **Server-Side File Persistence (`facultyController.js`):**
-   - Strips base64 header (`data:*;base64,`).
-   - Converts to binary buffer via `Buffer.from(cleanBase64, 'base64')`.
-   - Generates sanitized filesystem name: `${Date.now()}_${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`.
-   - Synchronously writes binary buffer to `backend/uploads/` via `fs.writeFileSync`.
-4. **Database Record Update:**
-   - Writes `attachment_url = 'http://localhost:5000/uploads/' + safeName`.
-   - Writes `attachment_filename = filename`.
-   - Sets `completed_at = NOW()` if status is completed.
-5. **Retrieval & Download:**
-   - Static Express handler routes `GET /uploads/:filename` directly to the `backend/uploads/` directory.
-   - HOD dashboard renders an active download anchor (`<a href="attachment_url" target="_blank">Download</a>`).
+### 3.2 Database Initialization
+Create database in PostgreSQL:
+```sql
+CREATE DATABASE uniflow;
+```
+
+### 3.3 Configuration (`backend/.env`)
+Create `backend/.env` containing the following variable definitions (do NOT commit secrets to public repositories):
+```ini
+PORT=5000
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=uniflow
+DB_USER=postgres
+DB_PASSWORD=<your_postgres_password>
+JWT_SECRET=<your_secure_random_jwt_secret>
+```
+
+### 3.4 Installation & Seeding Commands
+Execute from the terminal:
+```bash
+# 1. Install backend dependencies
+cd backend
+npm install
+
+# 2. Seed database tables, initial users, courses, subjects, and student data
+npm run seed
+
+# 3. (Optional) Populate multi-teacher simulation for Chart.js analytics
+node simulate_workload.js
+
+# 4. Start the production backend server
+npm start
+# OR start with auto-reload for development
+npm run dev
+```
+
+### 3.5 Serving the Frontend
+The frontend can be accessed in two verified ways:
+1. **Via Express Server (Recommended):** Open `http://localhost:5000/` or `http://localhost:5000/index.html`. Express serves the entire `UI/` folder via `app.use(express.static(path.join(__dirname, '../../UI')))`.
+2. **Via Live Server / File Server:** Open `UI/index.html` via VS Code Live Server (`http://127.0.0.1:5500/UI/index.html`). The frontend scripts (`login.js`, `faculty.js`, `hod.js`, `student.js`) explicitly point to `http://localhost:5000` via `const API_URL = 'http://localhost:5000'`.
 
 ---
 
-## 5. Architectural Data Flow Diagrams
+## 4. Test Accounts Seeded in Database
 
-### 5.1 Level 0 Context Diagram
-```
-                             Credentials / Login
-               ┌──────────────────────────────────────────────┐
-               │                                              ▼
-       ┌───────────────┐                             ┌─────────────────┐
-       │     Users     │ ◄────────────────────────── │                 │
-       │ (Admin, HOD,  │        Auth JWT Token       │                 │
-       │ Faculty, Stu) │                             │                 │
-       └───────────────┘                             │                 │
-               │                                     │                 │
-               │ Tasks / Assignments / Deliverables  │     UNIFLOW     │
-               │ Classes / Course Declarations       │   CORE ENGINE   │
-               ▼                                     │                 │
-       ┌───────────────┐                             │                 │
-       │   Dashboards  │ ──────────────────────────► │                 │
-       │   & Consoles  │                             │                 │
-       └───────────────┘                             └────────┬────────┘
-               ▲                                              │
-               │           Analytics / Workload Reports       │
-               └──────────────────────────────────────────────┘
-```
+The seeding script `backend/seed.js` initializes the following verified accounts (passwords are stored as salted bcrypt hashes; secret passwords omitted per audit protocol):
 
-### 5.2 Level 1 Data Flow Diagram (Operational Processes)
-```
-[ HOD User ]
-     │
-     ├──(1. Propose Task)──────────────────► [ Process 1.0: Workload Capacity Engine ]
-     │                                            │
-     │◄──(2. Overload / 409 Conflict / Alts)──────┤  (Checks 15-pt limit)
-     │                                            ▼
-     └──(3. Approve Safe Assignment)──────► [ Process 2.0: Task Persistence ]
-                                                  │
-                                                  ▼
-                                            [( Database: tasks )]
-                                                  │
-[ Faculty User ]                                  │
-     │                                            │
-     ├──(4. Fetch Active Tasks & Calendar)◄───────┘
-     │
-     ├──(5. Submit Task Deliverable & File)──► [ Process 3.0: Deliverable Storage ]
-     │                                            │
-     │                                            ├──► [( File System: /uploads/ )]
-     │                                            └──► [( Database: tasks.attachment_url )]
-     │
-     ├──(6. Declare Academic Class Load)────► [ Process 4.0: Academic Workload Engine ]
-     │                                            │  (Computes L-T-P-J Formulation)
-     │                                            ▼
-     │                                      [( Database: workload_master, etc. )]
-     │
-     └──(7. Assign Student Work)────────────► [ Process 5.0: Student Collision Engine ]
-                                                  │  (Checks 10-pt daily / 18-pt weekly)
-                                                  ▼
-                                            [( Database: student_assignments )]
-                                                  │
-[ Student User ]                                  ▼
-     │                                      [( Database: student_assignment_submissions )]
-     │                                            ▲
-     ├──(8. View Workload Bar & Due Works)────────┤
-     └──(9. Submit Assignment Turn-In)────────────┘
-```
+| Role | Name | Email | Custom ID | Department / Scope |
+| :--- | :--- | :--- | :--- | :--- |
+| **Super Admin** | UniFlow Administrator | `admin@uniflow.edu` | `ADM001` | System-wide |
+| **HOD (CS)** | Dr. Alan Turing | `hod.cs@uniflow.edu` | `HOD-CS01` | Computer Science (Dept ID: 1) |
+| **HOD (Mech)** | Dr. Nikola Tesla | `hod.me@uniflow.edu` | `HOD-ME02` | Mechanical Engineering (Dept ID: 2) |
+| **HOD (EEE)** | Dr. Marie Curie | `hod.ee@uniflow.edu` | `HOD-EE03` | Electrical Engineering (Dept ID: 3) |
+| **Faculty Member** | Grace Hopper | `faculty@uniflow.edu` | `FAC001` | Computer Science (Dept ID: 1) |
+| **Faculty Member** | Linus Torvalds | `linus@uniflow.edu` | `FAC002` | Computer Science (Dept ID: 1) |
+| **Student** | Ada Lovelace | `student@uniflow.edu` | `STU001` | B.Tech CSE, Semester 5, Sec A |
+| **Student** | Tim Berners-Lee | `tim@uniflow.edu` | `STU002` | B.Tech CSE, Semester 5, Sec A |
+
+When `simulate_workload.js` is run, 3 additional faculty members are created:
+- Dr. John Doe (`john@uniflow.edu`, `FAC002` re-used customId)
+- Dr. Jane Smith (`jane@uniflow.edu`, `FAC003`)
+- Dr. Alan Walker (`alan@uniflow.edu`, `FAC004`)

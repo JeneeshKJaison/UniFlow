@@ -1,272 +1,309 @@
-# UniFlow — Workload Balancing Algorithms & Mathematical Models
+# UniFlow — Verified Workload Algorithms & Engines (v2)
 
-UniFlow incorporates three distinct mathematical workload engines:
-1. **Engine A:** Administrative Task Allocation Engine (HOD $\rightarrow$ Faculty)
-2. **Engine B:** Pedagogical Workload Balancing Engine (Faculty $\rightarrow$ Student)
-3. **Engine C:** Comprehensive Academic Workload Formulation (L-T-P-J Model)
-
-Every formula and algorithm below is verified against active code in `backend/src/controllers/workloadController.js` and `backend/src/controllers/facultyController.js`.
+> **Document Status:** VERIFIED AGAINST CONTROLLER SOURCE CODE & LIVE EXECUTION  
+> **Audit Target:** Git Commit `6a2fff722c3d8cab187c5e95882cd1c894d185c6` (Branch: `main`)  
+> **Auditor Role:** Senior Software Architect & Algorithm Auditor  
+> **Date of Audit:** October 23, 2026  
 
 ---
 
-# 1. ENGINE A: Administrative Task Allocation (HOD $\rightarrow$ Faculty)
+## 1. Engine A: HOD Task Delegation & Overload Prevention Engine
 
-## 1.1 Mathematical Formulation & Invariants
-- **Permissible Task Difficulty:** $\text{Diff} \in [1, 10] \cap \mathbb{Z}$ (1 = Minimal clerical duty, 10 = Exhaustive departmental audit/accreditation project).
-- **Task Time Interval:** $[S_i, D_i]$, where $S_i$ is `scheduled_date` and $D_i$ is `deadline` (if deadline is omitted, $D_i = S_i$).
-- **Active Task Invariant:** A task is active if and only if:
-  $$\text{Status}(T_i) \notin \{\text{'completed'}\}$$
-- **Time Window Overlap Condition:** An existing task $T_i$ overlaps with proposed task $T_{new} = [S_{new}, D_{new}]$ if and only if:
-  $$\text{Overlap}(T_i, T_{new}) \iff (T_i.S \le D_{new}) \land (T_i.D \ge S_{new})$$
-- **Cumulative Active Workload:**
-  $$W_{\text{active}}(F, [S_{new}, D_{new}]) = \sum_{T_i \in \text{Tasks}(F)} T_i.\text{difficulty} \quad \text{s.t. } \text{Active}(T_i) \land \text{Overlap}(T_i, T_{new})$$
-- **Strict Capacity Invariant (15-Point Limit):**
-  $$W_{\text{active}}(F, [S_{new}, D_{new}]) + \text{Diff}_{new} \le 15$$
+### 1.1 Purpose & Governance Rule
+Prevents the Head of Department from assigning administrative or departmental duties to a faculty member whose active workload within the target date window would exceed the institutional threshold of **15 points**.
 
-## 1.2 Algorithmic Execution Workflow (`POST /api/workload/suggest`)
+### 1.2 Mathematical Formulation & Parameters
+- **Threshold Ceiling:** $\Omega_{\text{max}} = 15$ points (`WORKLOAD_THRESHOLD = 15` in `workloadController.js:25`).
+- **Input Variables:**
+  - $f$: Target faculty ID (`assigned_to`, integer).
+  - $D_{\text{new}}$: Difficulty rating of proposed task ($1 \le D_{\text{new}} \le 10$).
+  - $S_{\text{req}}$: Scheduled start date (`scheduled_date`, YYYY-MM-DD).
+  - $E_{\text{req}}$: Deadline date (`deadline`, YYYY-MM-DD; defaults to $S_{\text{req}}$ if omitted).
+  - $L_{\text{duration}} = \max(0, \text{round}((E_{\text{req}} - S_{\text{req}}) / 86400000))$: Duration in calendar days.
+- **Active Overlapping Workload ($W_{\text{active}}$):**
+  $$W_{\text{active}}(f, S_{\text{req}}, E_{\text{req}}) = \sum_{t \in T_{\text{active}}(f)} D_t$$
+  Where $T_{\text{active}}(f)$ is the set of all tasks assigned to faculty $f$ where:
+  $$\text{status} \ne \text{'completed'} \quad \land \quad \text{scheduled\_date}_t \le E_{\text{req}} \quad \land \quad \max(\text{deadline}_t, \text{scheduled\_date}_t) \ge S_{\text{req}}$$
+- **Resulting Workload ($W_{\text{resulting}}$):**
+  $$W_{\text{resulting}} = W_{\text{active}} + D_{\text{new}}$$
+- **Delegation Decision Function:**
+  $$\text{CanAssign} = \begin{cases} \text{true}, & \text{if } W_{\text{resulting}} \le 15 \\ \text{false}, & \text{if } W_{\text{resulting}} > 15 \end{cases}$$
 
-```
-[ Incoming Task Proposal ]
-  (Faculty F, Difficulty Diff, Interval [S, D])
-              │
-              ▼
-[ Overlapping Workload Query ]
-  Calculates W_active from PostgreSQL
-              │
-              ▼
-   Is W_active + Diff <= 15 ?
-       │               │
-      YES              NO
-       │               │
-       ▼               ▼
-[ can_assign: true ] [ can_assign: false (Overload) ]
-                       │
-                       ├──► [ Alternative Faculty Heuristic ]
-                       │      Find qualified peers where W_peer + Diff <= 15
-                       │
-                       └──► [ Alternative Date Heuristic ]
-                              generate_series(S+1, S+30) where W_date + Diff <= 15
-```
-
-### Verified SQL for Overlapping Workload Calculation:
+### 1.3 Exact SQL & Code Implementation (`workloadController.js:493-503`)
 ```sql
-SELECT 
-    COALESCE(SUM(t.difficulty), 0) AS current_workload,
-    COALESCE(json_agg(json_build_object(
-        'id', t.id, 'description', t.description,
-        'difficulty', t.difficulty, 'scheduled_date', t.scheduled_date,
-        'deadline', t.deadline, 'status', t.status
-    )) FILTER (WHERE t.id IS NOT NULL), '[]') AS overlapping_tasks
+SELECT COALESCE(SUM(t.difficulty), 0) AS current_workload
 FROM tasks t
 WHERE t.assigned_to = $1
   AND (t.status IS NULL OR t.status != 'completed')
-  AND t.scheduled_date <= $3   -- $3 = end_date
-  AND COALESCE(t.deadline, t.scheduled_date) >= $2; -- $2 = start_date
+  AND t.scheduled_date <= $3
+  AND COALESCE(t.deadline, t.scheduled_date) >= $2;
 ```
 
-## 1.3 Alternative Recommendation Heuristics
-
-### Heuristic 1: Alternative Faculty Discovery
-Searches for faculty members qualified to take the task without exceeding capacity:
-- **Qualification Rule:** Faculty must teach the subject (`subject_faculty`) OR belong to the same department (`user_departments`).
-- **Capacity Constraint:** Peer's current overlapping workload in $[S_{new}, D_{new}] + \text{Diff}_{new} \le 15$.
-- **Ranking Function:** Prioritizes subject instructors, then lowest active workload:
-  `ORDER BY teaches_subject DESC, current_workload ASC, u.name ASC LIMIT 5`.
-
-### Heuristic 2: Alternative Date Discovery
-Uses PostgreSQL's `generate_series()` function to scan 30 calendar days ahead of $S_{new}$:
-```sql
-SELECT 
-    TO_CHAR(d::date, 'YYYY-MM-DD') AS alternative_scheduled_date,
-    TO_CHAR((d::date + $duration * INTERVAL '1 day')::date, 'YYYY-MM-DD') AS alternative_deadline,
-    COALESCE((
-        SELECT SUM(t.difficulty) FROM tasks t
-        WHERE t.assigned_to = $facultyId
-          AND (t.status IS NULL OR t.status != 'completed')
-          AND t.scheduled_date <= (d::date + $duration * INTERVAL '1 day')::date
-          AND COALESCE(t.deadline, t.scheduled_date) >= d::date
-    ), 0) AS existing_workload
-FROM generate_series($start::date + INTERVAL '1 day', $start::date + INTERVAL '30 days', INTERVAL '1 day') AS d
-WHERE existing_workload + $taskDifficulty <= 15
-ORDER BY existing_workload ASC, d ASC
-LIMIT 4;
-```
-
-## 1.4 Concurrency & Race-Condition Audit
-- **Code Audit in `assignTask` (`workloadController.js` lines 493–547):**
-  The endpoint executes a `SELECT SUM(...)` query, evaluates `if (resultingWorkload > 15)`, and then executes `INSERT INTO tasks ...`.
-- **Finding:** **No database transaction (`BEGIN...COMMIT`) or row-level lock (`SELECT ... FOR UPDATE`) is used in `assignTask`.** If two administrative requests are made simultaneously for the same faculty member, both read operations could observe capacity before either commits, allowing concurrent commits to breach the 15-point ceiling.
-
----
-
-# 2. ENGINE B: Pedagogical Workload Collision Engine (Faculty $\rightarrow$ Student)
-
-## 2.1 Mathematical Formulation & Invariants
-- **Target Class Scoping:** Strictly isolated by $(C_{\text{id}}, \text{Sem})$, where $C_{\text{id}}$ is the course ID and $\text{Sem}$ is the academic semester.
-- **Daily Class Capacity Limit:**
-  $$W_{\text{daily}}(C_{\text{id}}, \text{Sem}, D_{\text{due}}) = \sum_{A_i \in \text{Assignments}} A_i.\text{difficulty} \le 10 \text{ points}$$
-- **Weekly Rolling Window Capacity Limit ($\pm 3$ Days):**
-  $$W_{\text{weekly}}(C_{\text{id}}, \text{Sem}, D_{\text{due}}) = \sum_{A_i \in \text{Assignments}} A_i.\text{difficulty} \le 18 \text{ points}$$
-  where $A_i.\text{due\_date} \in [D_{\text{due}} - 3\text{ days}, D_{\text{due}} + 3\text{ days}]$.
-- **Collision Condition:**
-  $$\text{HasCollision} \iff (W_{\text{daily}} + \text{Diff}_{new} > 10) \lor (W_{\text{weekly}} + \text{Diff}_{new} > 18)$$
-
-## 2.2 Algorithmic Execution Workflow (`POST /api/faculty/student-assignments/check`)
-1. **Scope Verification:** Verifies assigning faculty is allocated to subject via `subject_faculty` (`sf.subject_id = $1 AND sf.faculty_id = $2`). Rejects with `403 Forbidden` if unauthorized.
-2. **Daily Load Calculation:** Executes SQL `SUM(difficulty)` for target course and semester on exact `due_date`.
-3. **Weekly Rolling Load Calculation:** Executes SQL `SUM(difficulty)` for target course and semester across interval `due_date - 3 days` to `due_date + 3 days`.
-4. **Collision Evaluation:** If daily limit (10) or weekly limit (18) is exceeded:
-   - Sets `can_assign = false` and `is_overloaded = true`.
-   - Scans upcoming 14 calendar days ($d \in [D_{\text{due}} + 1, D_{\text{due}} + 14]$).
-   - Collects up to 4 safe dates where candidate daily load $+ \text{Diff}_{new} \le 10$.
-   - Returns alert payload triggering the frontend **Student Workload Alert Modal**.
-
-## 2.3 Atomic Publishing & Roster Generation (`POST /api/faculty/student-assignments`)
-Unlike Engine A, Engine B implements an **atomic PostgreSQL transaction** (`client.query('BEGIN')` ... `COMMIT`):
-1. Inserts the assignment record into `student_assignments`.
-2. Queries all students enrolled in that class: `SELECT user_id FROM students WHERE course_id = $1 AND semester = $2`.
-3. Iteratively creates default submission records:
+### 1.4 Recommendations on Overload
+When $W_{\text{resulting}} > 15$:
+1. **Alternative Faculty Discovery (`workloadController.js:347-388`):**
+   Queries up to 5 faculty members (`LIMIT 5`) who teach the subject or belong to the department whose active load plus $D_{\text{new}} \le 15$:
    ```sql
-   INSERT INTO student_assignment_submissions (assignment_id, student_id, status)
-   VALUES ($1, $2, 'pending')
-   ON CONFLICT (assignment_id, student_id) DO NOTHING;
+   ORDER BY teaches_subject DESC, current_workload ASC, u.name ASC
    ```
-4. On error, executes `ROLLBACK`.
+2. **Alternative Date Discovery (`workloadController.js:283-345`):**
+   Scans forward 14 days (`offset = 1..14`) in window blocks of $L_{\text{duration}}$ days. Checks if $W_{\text{active}}(f, S_{\text{cand}}, E_{\text{cand}}) + D_{\text{new}} \le 15$. Returns up to 3 candidate dates (`LIMIT 3`).
 
-## 2.4 Student Real-Time Workload Recalculation
-In `studentController.js` (`getStudentDashboard`), a student's active workload score only includes pending assignments:
+### 1.5 Execution Trace (HOD Console)
+1. **User Action:** HOD opens Task Assignment modal (`UI/hod/dashboard.html:#taskModal`), enters subject, faculty, difficulty, dates, and clicks **"Check Workload"** (`#suggestBtn`).
+2. **API Call:** `POST /api/workload/suggest` with JSON payload.
+3. **Controller:** Computes $W_{\text{active}}$. If overloaded, returns HTTP 200 with `can_assign: false` and lists alternative teachers/dates. UI renders suggestion pills.
+4. **Assignment Attempt:** HOD clicks **"Assign Task"** (`#assignBtn`), issuing `POST /api/workload/assign`.
+5. **Strict Server Guard:** If $W_{\text{resulting}} > 15$, returns **HTTP 409 Conflict** with detailed diagnostic message. If within limit, executes `INSERT INTO tasks (..., status = 'approved')` and returns **HTTP 201 Created**.
+
+### 1.6 Boundary & Edge Cases
+| Scenario | Behavior in Code | Verified Status |
+| :--- | :--- | :--- |
+| **Resulting workload exactly 15 ($W = 15$)** | Allowed. Condition is `resultingWorkload <= WORKLOAD_THRESHOLD`. | VERIFIED |
+| **Resulting workload 16 ($W = 16$)** | Rejected with HTTP 409 Conflict. | VERIFIED (Live test) |
+| **Task with status `'completed'`** | Excluded from sum (`status != 'completed'`). Does not count towards 15 pts. | VERIFIED |
+| **Task with no deadline (`deadline = NULL`)** | Handled via `COALESCE(deadline, scheduled_date)`. Treated as single-day task. | VERIFIED |
+| **Task with no scheduled date** | Rejected upfront: HTTP 400 Bad Request (`!scheduled_date`). | VERIFIED |
+| **Repeated rapid clicks** | If two clicks send identical requests, both will check DB. | **RACE HAZARD** |
+
+### 1.7 Concurrency & Atomicity Audit
+> [!WARNING]
+> **Check-Then-Insert Race Condition in `assignTask`:**
+> `assignTask` executes `pool.query(SELECT ...)` followed by an `if (resultingWorkload > WORKLOAD_THRESHOLD)` check, and finally `pool.query(INSERT ...)`.
+> It does NOT use a transaction (`BEGIN`), does NOT use `SELECT ... FOR UPDATE`, and does NOT utilize advisory locks or database table constraints.
+> If two concurrent requests hit PostgreSQL at the exact same millisecond for a faculty member with 0 load, both will read 0, both will pass the `> 15` check, and both will insert, resulting in an overloaded state (e.g. $8 + 8 = 16 > 15$).
+
+---
+
+## 2. Engine B: Student Assignment Collision Detection Engine
+
+### 2.1 Purpose & Institutional Need
+Prevents academic burnout caused by multiple professors scheduling heavy assignment deadlines for the same student cohort on the exact same date or within the same instructional week.
+
+### 2.2 Mathematical Formulation & Limits
+- **Daily Cohort Threshold:** $\Delta_{\text{daily}} = 10$ points (`MAX_DAILY_STUDENT_WORKLOAD = 10` in `facultyController.js:4`).
+- **Weekly Cohort Threshold:** $\Delta_{\text{weekly}} = 18$ points (`MAX_WEEKLY_STUDENT_WORKLOAD = 18` in `facultyController.js:5`).
+- **Target Student Cohort Identification:**
+  Determined by the assigned subject's `course_id` (degree program) and `semester` (e.g. B.Tech CSE, Semester 5).
+- **1. Daily Workload Calculation:**
+  $$W_{\text{daily}}(C, S, \text{due\_date}) = \sum_{a \in A(C, S, \text{due\_date})} D_a$$
+  $$W_{\text{daily, resulting}} = W_{\text{daily}} + D_{\text{new}}$$
+  $$\text{IsDailyOverloaded} = (W_{\text{daily, resulting}} > 10)$$
+- **2. Weekly Workload Calculation (Rolling 7-Day Window):**
+  $$W_{\text{weekly}}(C, S, \text{due\_date}) = \sum_{a \in A_{\text{week}}(C, S, \text{due\_date})} D_a$$
+  Where $A_{\text{week}}$ encompasses all assignments where:
+  $$\text{due\_date}_a \in [\text{due\_date} - 3\text{ days}, \quad \text{due\_date} + 3\text{ days}]$$
+  $$W_{\text{weekly, resulting}} = W_{\text{weekly}} + D_{\text{new}}$$
+  $$\text{IsWeeklyOverloaded} = (W_{\text{weekly, resulting}} > 18)$$
+- **3. Collision Condition:**
+  $$\text{HasCollision} = \text{IsDailyOverloaded} \lor \text{IsWeeklyOverloaded}$$
+
+### 2.3 Exact SQL & Code Implementation (`facultyController.js:215-255`)
+#### Daily Workload SQL
 ```sql
 SELECT 
-    COUNT(sa.id) FILTER (WHERE sas.status = 'pending' OR sas.status IS NULL) AS pending_assignments,
-    COALESCE(SUM(sa.difficulty) FILTER (WHERE sas.status = 'pending' OR sas.status IS NULL), 0) AS active_workload_points
+    COALESCE(SUM(sa.difficulty), 0) AS total_difficulty,
+    COUNT(sa.id) AS assignment_count,
+    COALESCE(json_agg(...) FILTER (WHERE sa.id IS NOT NULL), '[]') AS assignments
 FROM student_assignments sa
-LEFT JOIN student_assignment_submissions sas ON sa.id = sas.assignment_id AND sas.student_id = $1
-WHERE sa.course_id = $2 AND sa.semester = $3;
+JOIN subjects s2 ON sa.subject_id = s2.id
+WHERE sa.course_id = $1 AND sa.semester = $2 AND sa.due_date = $3;
 ```
-**Impact:** When a student submits an assignment via `PATCH /api/student/assignments/:id/submit`, `sas.status` changes from `'pending'` to `'submitted'`, instantly reducing the student's active workload points and updating the progress bar.
+#### Weekly Workload SQL (Rolling $\pm 3$ Days Window)
+```sql
+SELECT COALESCE(SUM(difficulty), 0) AS total_difficulty
+FROM student_assignments
+WHERE course_id = $1 AND semester = $2
+  AND due_date BETWEEN ($3::date - INTERVAL '3 days') AND ($3::date + INTERVAL '3 days');
+```
+
+### 2.4 Alternative Dates Calculation (`facultyController.js:260-294`)
+When a collision is detected, Engine B scans forward across the next 14 calendar days:
+```javascript
+for (let offset = 1; offset <= 14; offset++) {
+    const candidateDate = new Date(requestedDate);
+    candidateDate.setDate(requestedDate.getDate() + offset);
+    // Checks ONLY daily limit
+    if (candDaily + taskDiff <= MAX_DAILY_STUDENT_WORKLOAD) {
+        alternativeDates.push({ date: dateStr, resulting_workload: candResulting });
+    }
+    if (alternativeDates.length >= 4) break; // Returns top 4 recommendations
+}
+```
+*Critical Audit Finding:* The alternative date scan checks **only** the daily threshold ($\le 10$). It omits the weekly check ($\le 18$) during alternative date discovery.
+
+### 2.5 Execution Trace & Override Workflow
+1. Faculty opens Student Assignment modal (`UI/faculty/dashboard.html:#assignmentModal`).
+2. Faculty enters subject, difficulty, and proposed due date, then clicks **"Check Collision"** (`#checkCollisionBtn`).
+3. Frontend calls `POST /api/faculty/student-assignments/check`.
+4. If a collision occurs, frontend displays a red warning banner (`#collisionAlertBox`) with the reason and renders alternative date buttons.
+5. If the faculty member insists on publishing despite the collision, they can proceed if they check an override flag (`override_collision = true`). Otherwise, `POST /api/faculty/student-assignments` rejects with **HTTP 409 Conflict**.
+6. When successfully published, a database transaction inserts into `student_assignments` and automatically provisions `student_assignment_submissions` for all enrolled students with `status = 'pending'`.
 
 ---
 
-# 3. ENGINE C: Comprehensive Academic Faculty Workload Formulation
+## 3. Engine C: Academic Course Workload Formulation Engine
 
-Triggered when a faculty member submits their course declaration form (`POST /api/workload/classes`). The inputs include:
-- Role / In-Charge Type: `Theory`, `Lab`, `Project`
-- L-T-P-J Curriculum Code: String format `L-T-P-J` (e.g., `3-1-0-0`, `2-1-2-0`)
-- Class Size: `studentsClass` (default: 60)
-- Laboratory Students: `studentsInLab`
-- Project Students: `studentsInProject`
-- Prior Experience: Boolean (`true` / `false`)
-- Lab Modification: Boolean (`true` / `false`)
+### 3.1 Purpose & Institutional Framework
+Translates course L-T-P-J codes, student cohort sizes, and faculty instructional roles into quantified semester workload units based on the TKM College of Engineering Regulations 2023 design summary.
 
-## 3.1 Component 1: Teaching Loads (`teaching_loads`)
-From L-T-P-J code: $L$ = Lecture hours, $T$ = Tutorial hours, $P$ = Practical hours, $J$ = Project hours.
+### 3.2 Master Equation
+$$\text{Grand Total Academic Workload} = (\text{Teaching Load} + \text{Setting Units} + \text{Prep Units} + \text{Evaluation Units}) \times \mu_{\text{exp}}$$
 
-$$\begin{aligned}
-\text{Weighted Theory} &= L \times 1.0 \\
-\text{Weighted Lab} &= P \times 0.5 \\
-\text{Weighted Project} &= J \times 0.5 \\
-\text{Weighted Tutorial} &= T \times 0.5 \\
-\text{Lab Supervision} &= \text{studentsInLab} \times 0.02 \\
-\text{Project Mentoring} &= \text{studentsInProject} \times 0.05 \\
-\text{Large Class Adjustment} &= \begin{cases} 1.0 & \text{if } \text{studentsClass} > 80 \\ 0.0 & \text{otherwise} \end{cases}
-\end{aligned}$$
-
-$$\mathbf{TL} = \text{Weighted Theory} + \text{Weighted Lab} + \text{Weighted Project} + \text{Weighted Tutorial} + \text{Lab Supervision} + \text{Project Mentoring} + \text{Large Class Adj}$$
-
-## 3.2 Component 2: Question & Assignment Setting (`paper_and_assignment_setting`)
-- **Question Paper Units:**
-  $$N_{\text{papers}} = \begin{cases} 3 & \text{if L-T-P-J } \in \{\text{'3-1-0-0'}, \text{'2-1-2-0'}\} \\ 2 & \text{if L-T-P-J } \in \{\text{'2-0-0-0'}, \text{'2-0-2-2'}\} \\ 1 & \text{if L-T-P-J } = \text{'1-0-2-0'} \\ 0 & \text{otherwise} \end{cases}$$
-- **Assignment Setting Units:**
-  $$N_{\text{assignments}} = \begin{cases} 4 & \text{if L-T-P-J } \in \{\text{'3-1-0-0'}, \text{'2-1-2-0'}, \text{'2-0-2-2'}\} \\ 2 & \text{otherwise} \end{cases}$$
-- **Subtotal Setting Units:**
-  $$\mathbf{SL} = (N_{\text{papers}} \times 1.0) + (N_{\text{assignments}} \times 0.5)$$
-
-## 3.3 Component 3: Preparation Adjustment Units (`preparation_and_course_factors`)
-Allocated strictly based on selected role:
-- **If Role = 'Theory':**
-  - Subject Preparation = $2.0$
-  - Rubric Formulation = $2.0$
-  - CO-PO Mapping = $2.0$
-  - $\mathbf{PL} = 2.0 + 2.0 + 2.0 = \mathbf{6.0 \text{ units}}$
-- **If Role = 'Lab':**
-  - Experiments Preparation = $2.0$
-  - Rubric Formulation = $2.0$
-  - Continuous Evaluation Sheets = $0.5$
-  - CO-PO Mapping = $2.0$
-  - Lab Modification Allowance: If `labModification == true` $\rightarrow 2.0$; else $\rightarrow 0.5$.
-  - $\mathbf{PL} = 2.0 + 2.0 + 0.5 + 2.0 + (2.0 \text{ or } 0.5) = \mathbf{8.5 \text{ or } 7.0 \text{ units}}$
-- **If Role = 'Project':**
-  - Project Rubric Formulation = $2.0$
-  - Evaluation Sheet Preparation = $0.5$
-  - CO-PO Mapping = $2.0$
-  - Review Scheduling = $0.5$
-  - $\mathbf{PL} = 2.0 + 0.5 + 2.0 + 0.5 = \mathbf{5.0 \text{ units}}$
-
-## 3.4 Component 4: Evaluation Units (`evaluation_units`)
-Evaluated based on student volumes and exam formats:
-$$\begin{aligned}
-\text{Series Scripts} &= (2 \times \text{studentsClass}) \times 0.05 \\
-\text{End-Semester Scripts} &= \begin{cases} 0 & \text{if course contains 'without ese', 'project', or 'seminar'} \\ \text{studentsClass} \times 0.08 & \text{otherwise} \end{cases} \\
-\text{Assignment Scripts} &= (N_{\text{assignments}} \times \text{studentsClass}) \times 0.02 \\
-\text{Lab Outputs} &= (10 \times \text{studentsInLab}) \times 0.05 \\
-\text{Practical Exams} &= \text{studentsInLab} \times 0.10 \\
-\text{Viva-Voce Count} &= \text{studentsInProject} \times 0.15 \\
-\text{Project Reviews} &= \text{studentsInProject} \times 0.15
-\end{aligned}$$
-
-$$\mathbf{EL} = \sum \text{All Weighted Evaluation Components Above}$$
-
-## 3.5 Component 5: Master Aggregation (`workload_master`)
-- **Experience Multiplier ($M_{\text{exp}}$):**
-  $$M_{\text{exp}} = \begin{cases} 0.90 & \text{if priorExperience} = \text{true} \\ 1.00 & \text{if priorExperience} = \text{false} \end{cases}$$
-- **Grand Total Master Workload:**
-  $$\mathbf{GrandTotal} = (\mathbf{TL} + \mathbf{SL} + \mathbf{PL} + \mathbf{EL}) \times M_{\text{exp}}$$
+Where:
+- $\mu_{\text{exp}} = 0.9$ if instructor has prior experience teaching the subject.
+- $\mu_{\text{exp}} = 1.0$ if teaching the subject for the first time.
 
 ---
 
-## 3.6 Worked Numerical Example
+### 3.3 Component Formulations & Code Constants
 
-### Scenario Input Parameters:
-- **Subject:** *Advanced Database Systems* (MCA Semester 2)
-- **Role:** `Theory`
-- **L-T-P-J Code:** `2-1-2-0` ($L=2, T=1, P=2, J=0$)
-- **Students in Class:** $85$ (Class $>80$, triggers Large Class Adjustment)
-- **Students in Lab:** $0$
-- **Students in Project:** $0$
-- **Prior Experience:** `true` ($>0$ semesters experience)
-- **Lab Modification:** `false`
+#### 1. Teaching Loads Subsystem (`teaching_loads`)
+From input L-T-P-J code (e.g. `3-1-2-0` $\rightarrow L=3, T=1, P=2, J=0$):
+$$\text{Weighted Theory} = L \times 1.0$$
+$$\text{Weighted Lab} = P \times 0.5$$
+$$\text{Weighted Project} = J \times 0.5$$
+$$\text{Weighted Tutorial} = T \times 0.5$$
+$$\text{Lab Supervision} = N_{\text{lab}} \times 0.02$$
+$$\text{Project Mentoring} = N_{\text{proj}} \times 0.05$$
+$$\text{Large Class Adj} = \begin{cases} 1.0, & \text{if } N_{\text{class}} > 80 \\ 0, & \text{otherwise} \end{cases}$$
+$$\text{Teaching Load Total} = \text{Weighted Theory} + \text{Weighted Lab} + \text{Weighted Project} + \text{Weighted Tutorial} + \text{Lab Supervision} + \text{Project Mentoring} + \text{Large Class Adj}$$
 
-### Step-by-Step Mathematical Calculation:
-1. **Teaching Load ($TL$):**
-   - Weighted Theory: $2 \times 1.0 = 2.0$
-   - Weighted Tutorial: $1 \times 0.5 = 0.5$
-   - Weighted Lab: $2 \times 0.5 = 1.0$
-   - Weighted Project: $0 \times 0.5 = 0.0$
-   - Lab Supervision: $0 \times 0.02 = 0.0$
-   - Project Mentoring: $0 \times 0.05 = 0.0$
-   - Large Class Adjustment: $85 > 80 \implies +1.0$
-   - $\mathbf{TL} = 2.0 + 0.5 + 1.0 + 0 + 0 + 0 + 1.0 = \mathbf{4.50 \text{ units}}$
+#### 2. Question Paper & Assignment Setting (`paper_and_assignment_setting`)
+Hardcoded rules based on L-T-P-J code (`workloadController.js:655-665`):
+- **Question Papers ($W_{\text{paper}} = 1.0$ each):**
+  - If code is `'2-0-0-0'` or `'2-0-2-2'`: $N_{\text{papers}} = 2$.
+  - If code is `'1-0-2-0'`: $N_{\text{papers}} = 1$.
+  - If code is `'3-1-0-0'` or `'2-1-2-0'`: $N_{\text{papers}} = 3$.
+  - All other codes: $N_{\text{papers}} = 0$.
+- **Assignments ($W_{\text{assign}} = 0.5$ each):**
+  - If code is `'3-1-0-0'`, `'2-1-2-0'`, or `'2-0-2-2'`: $N_{\text{assign}} = 4$.
+  - All other codes: $N_{\text{assign}} = 2$.
+$$\text{Setting Units Subtotal} = (N_{\text{papers}} \times 1.0) + (N_{\text{assign}} \times 0.5)$$
 
-2. **Setting Units ($SL$):**
-   - Question Papers for `2-1-2-0`: $3$ papers $\times 1.0 = 3.0$
-   - Assignments for `2-1-2-0`: $4$ assignments $\times 0.5 = 2.0$
-   - $\mathbf{SL} = 3.0 + 2.0 = \mathbf{5.00 \text{ units}}$
+#### 3. Preparation Adjustment Units (`preparation_and_course_factors`)
+Fixed unit assignments determined strictly by the faculty member's instructional role (`workloadController.js:673-683`):
+- **If Role = `'Theory'`:**
+  - Subject Preparation: $1 \times 2.0 = 2.0$
+  - Rubrics Preparation: $1 \times 2.0 = 2.0$
+  - CO-PO Mapping: $1 \times 2.0 = 2.0$
+  - **Subtotal = 6.0 units**
+- **If Role = `'Lab'`:**
+  - Experiments Preparation: $1 \times 2.0 = 2.0$
+  - Rubrics Preparation: $1 \times 2.0 = 2.0$
+  - Evaluation Sheets: $1 \times 0.5 = 0.5$
+  - CO-PO Mapping: $1 \times 2.0 = 2.0$
+  - Lab In-Charge Modification: $2.0$ (if `labModification = true`), $0.5$ (if `false`)
+  - **Subtotal = 8.5 units (with modifications) or 7.0 units (routine)**
+- **If Role = `'Project'`:**
+  - Rubrics Preparation: $1 \times 2.0 = 2.0$
+  - Evaluation Sheets: $1 \times 0.5 = 0.5$
+  - CO-PO Mapping: $1 \times 2.0 = 2.0$
+  - Project Scheduling: $1 \times 0.5 = 0.5$
+  - **Subtotal = 5.0 units**
 
-3. **Preparation Units ($PL$):**
-   - Role = 'Theory' $\implies 2.0 + 2.0 + 2.0 = \mathbf{6.00 \text{ units}}$
+#### 4. Evaluation Units (`evaluation_units`)
+Computed from student cohort quantities (`workloadController.js:687-712`):
+- Series Exam Scripts: $2 \times N_{\text{class}} \times 0.05$ (assumes 2 series exams/sem)
+- End-Semester Scripts: If course type does NOT include `'without ese'`, `'project'`, or `'seminar'`: $N_{\text{class}} \times 0.08$; otherwise $0$.
+- Assignment Scripts: $N_{\text{assign}} \times N_{\text{class}} \times 0.02$
+- Lab Output Evaluations: $N_{\text{lab}} \times 10 \times 0.05$ (assumes 10 weekly outputs)
+- Practical Exam Evaluations: $N_{\text{lab}} \times 1 \times 0.10$
+- Viva-Voce Evaluations: $N_{\text{proj}} \times 1 \times 0.15$
+- Project Evaluations: $N_{\text{proj}} \times 1 \times 0.15$
+$$\text{Evaluation Units Subtotal} = \sum \text{Weighted Evaluation Items}$$
 
-4. **Evaluation Units ($EL$):**
-   - Series Scripts: $(2 \times 85) \times 0.05 = 170 \times 0.05 = 8.50$
-   - End-Sem Scripts: $85 \times 0.08 = 6.80$
-   - Assignment Scripts: $(4 \times 85) \times 0.02 = 340 \times 0.02 = 6.80$
-   - Lab Outputs / Practical / Viva: $0.00$
-   - $\mathbf{EL} = 8.50 + 6.80 + 6.80 = \mathbf{22.10 \text{ units}}$
+---
 
-5. **Subtotal Before Experience Multiplier:**
-   $$\text{Subtotal} = 4.50 + 5.00 + 6.00 + 22.10 = \mathbf{37.60 \text{ units}}$$
+### 3.4 Verified Worked Examples (One per Role)
 
-6. **Grand Total Master Workload:**
-   - Multiplier $M_{\text{exp}} = 0.90$ (prior experience is true)
-   $$\mathbf{GrandTotal} = 37.60 \times 0.90 = \mathbf{33.84 \text{ units}}$$
+The calculations below were executed through a Node.js verification script (`scratch/worked_example_engine_c.js`) using the exact code constants from `workloadController.js:629-753`.
 
-*(Verified in `backend/simulate_workload.js` line 98).*
+#### Worked Example 1: Theory Role (Data Structures & Algorithms)
+- **Inputs:** Role: `Theory`, L-T-P-J: `3-1-0-0`, $N_{\text{class}} = 60$, $N_{\text{lab}} = 0$, $N_{\text{proj}} = 0$, Prior Experience: `true` ($\mu = 0.9$), Course Type: `'Core Theory'`.
+- **Step 1: Teaching Loads**
+  - Theory: $3 \times 1.0 = 3.0$
+  - Tutorial: $1 \times 0.5 = 0.5$
+  - Lab / Project / Supervision: $0$
+  - Large class adj: $0$ ($60 \le 80$)
+  - **Subtotal = 3.50 units**
+- **Step 2: Setting Units**
+  - Question Papers: Code `'3-1-0-0'` $\rightarrow 3 \times 1.0 = 3.0$
+  - Assignments: Code `'3-1-0-0'` $\rightarrow 4 \times 0.5 = 2.0$
+  - **Subtotal = 5.00 units**
+- **Step 3: Preparation Units**
+  - Fixed Theory Prep: $2.0 + 2.0 + 2.0 = \mathbf{6.00\text{ units}}$
+- **Step 4: Evaluation Units**
+  - Series Scripts: $2 \times 60 \times 0.05 = 6.00$
+  - End-Sem Scripts: $60 \times 0.08 = 4.80$
+  - Assignment Scripts: $4 \times 60 \times 0.02 = 4.80$
+  - Lab / Practical / Project: $0$
+  - **Subtotal = 15.60 units**
+- **Step 5: Master Compilation**
+  $$\text{Unweighted Total} = 3.50 + 5.00 + 6.00 + 15.60 = 30.10\text{ units}$$
+  $$\text{Grand Total Workload} = 30.10 \times 0.9 = \mathbf{27.0900\text{ units}}$$
+
+---
+
+#### Worked Example 2: Lab Role (Data Structures Laboratory)
+- **Inputs:** Role: `Lab`, L-T-P-J: `0-0-3-0`, $N_{\text{class}} = 60$, $N_{\text{lab}} = 30$, $N_{\text{proj}} = 0$, Prior Experience: `false` ($\mu = 1.0$), Lab Modification: `true`, Course Type: `'Practical / Laboratory without ESE'`.
+- **Step 1: Teaching Loads**
+  - Theory / Tutorial: $0$
+  - Lab Hours: $3 \times 0.5 = 1.50$
+  - Lab Supervision: $30 \times 0.02 = 0.60$
+  - Large class adj: $0$
+  - **Subtotal = 2.10 units**
+- **Step 2: Setting Units**
+  - Question Papers: Code `'0-0-3-0'` $\rightarrow 0 \times 1.0 = 0$
+  - Assignments: Code `'0-0-3-0'` $\rightarrow 2 \times 0.5 = 1.0$
+  - **Subtotal = 1.00 units**
+- **Step 3: Preparation Units**
+  - Experiments (2.0) + Rubrics (2.0) + Eval Sheets (0.5) + CO-PO (2.0) + Lab Mod (2.0) = $\mathbf{8.50\text{ units}}$
+- **Step 4: Evaluation Units**
+  - Series Scripts: $2 \times 60 \times 0.05 = 6.00$
+  - End-Sem Scripts: $0$ (Type includes `'without ese'`)
+  - Assignment Scripts: $2 \times 60 \times 0.02 = 2.40$
+  - Lab Outputs: $30 \times 10 \times 0.05 = 15.00$
+  - Practical Exam: $30 \times 1 \times 0.10 = 3.00$
+  - **Subtotal = 26.40 units**
+- **Step 5: Master Compilation**
+  $$\text{Unweighted Total} = 2.10 + 1.00 + 8.50 + 26.40 = 38.00\text{ units}$$
+  $$\text{Grand Total Workload} = 38.00 \times 1.0 = \mathbf{38.0000\text{ units}}$$
+
+---
+
+#### Worked Example 3: Project Role (Capstone Dissertation)
+- **Inputs:** Role: `Project`, L-T-P-J: `0-0-0-4`, $N_{\text{class}} = 60$, $N_{\text{lab}} = 0$, $N_{\text{proj}} = 15$, Prior Experience: `true` ($\mu = 0.9$), Course Type: `'Project / Dissertation without ESE'`.
+- **Step 1: Teaching Loads**
+  - Theory / Tutorial / Lab: $0$
+  - Project Hours: $4 \times 0.5 = 2.00$
+  - Project Mentoring: $15 \times 0.05 = 0.75$
+  - Large class adj: $0$
+  - **Subtotal = 2.75 units**
+- **Step 2: Setting Units**
+  - Question Papers: $0$
+  - Assignments: $2 \times 0.5 = 1.00$
+  - **Subtotal = 1.00 units**
+- **Step 3: Preparation Units**
+  - Rubrics (2.0) + Eval Sheets (0.5) + CO-PO (2.0) + Scheduling (0.5) = $\mathbf{5.00\text{ units}}$
+- **Step 4: Evaluation Units**
+  - Series Scripts: $2 \times 60 \times 0.05 = 6.00$
+  - End-Sem Scripts: $0$ (Type includes `'without ese'`)
+  - Assignment Scripts: $2 \times 60 \times 0.02 = 2.40$
+  - Viva-Voce: $15 \times 1 \times 0.15 = 2.25$
+  - Project Evaluations: $15 \times 1 \times 0.15 = 2.25$
+  - **Subtotal = 12.90 units**
+- **Step 5: Master Compilation**
+  $$\text{Unweighted Total} = 2.75 + 1.00 + 5.00 + 12.90 = 21.65\text{ units}$$
+  $$\text{Grand Total Workload} = 21.65 \times 0.9 = \mathbf{19.4850\text{ units}}$$
+
+---
+
+### 3.5 Differences Between Implementation and Design Workbook (`Phase 0 Item 9`)
+
+A detailed comparison between `workloadController.js:addClass` and `faculty_workload_design_summary.pdf` identified the following discrepancies:
+1. **Tutorial Hour Weighting:** Implemented as `tutorialHours * 0.5` in code; workbook guidelines in some sheets specified 1.0 unit per tutorial contact hour.
+2. **Question Paper Assignment Logic:** Rather than dynamic inputs, the code uses hardcoded conditional mapping based on L-T-P-J strings (`2-0-0-0` $\rightarrow 2$, `3-1-0-0` $\rightarrow 3$, etc.).
+3. **Fixed Preparation Totals:** The preparation factors do not take dynamic task quantities; they hardcode fixed totals by role ($6.0$ for Theory, $8.5/7.0$ for Lab, $5.0$ for Project).
+4. **Large Class Adjustment:** Applied as a flat $+1.0$ addition if `studentsClass > 80`, rather than a percentage scale factor ($1.25\times$).
+5. **Project Viva and Review Weights:** Both viva-voce and project evaluations are implemented with weight $0.15 \times N_{\text{proj}}$, giving a combined factor of $0.30$ per project student.

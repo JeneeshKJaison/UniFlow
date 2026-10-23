@@ -1,77 +1,121 @@
-# UniFlow — Project Overview & Documentation Handoff Index
+# UniFlow — Verified Project Overview (v2)
 
-## 1. Project Identity & Administrative Metadata
-
-- **Project Title:** UniFlow — Department Resource Management System
-- **Academic Course:** 23MCAM307 Mini Project — Scrum / Capstone Project
-- **Academic Year:** 2026 – 2027
-- **Target Institution / Department:** Department of Computer Applications, TKM College of Engineering
-- **Project Supervisor / Product Owner / Scrum Master:** Dr. Sheera Shamsu
-- **Student Contributors & Roll Numbers:**
-  - **Jeneesh K Jaison** — Roll No. `25MCA026` (Author email: `jeneeshjaisonk@gmail.com`)
-  - **Kiran Sivadas** — Roll No. `25MCA029` (Author email: `kiransivadas8@gmail.com`)
-- **Initial Division of Responsibility (from Project Diary):**
-  - Jeneesh K Jaison: Faculty and Student modules (end-to-end design, database, backend APIs, frontend integration).
-  - Kiran Sivadas: HOD and Admin modules (login authentication v1, HOD task allocation v1, Admin frontend configuration).
-- **Audit Execution Timestamp:** 2026-10-22T23:45:00+05:30
-- **Audit Target Commit:** `2f95fcc` (branch `main`, tag/message: `graph module`)
-- **Repository Location:** `c:\Users\Jenee\Downloads\TKM\Project\UniFlow`
+> **Document Status:** VERIFIED AGAINST SOURCE CODE  
+> **Audit Target:** Git Commit `6a2fff722c3d8cab187c5e95882cd1c894d185c6` (Branch: `main`)  
+> **Working Tree State:** Clean with respect to repository source files. One tracked configuration file (`backend/.env`) contains a single line addition defining the local `DB_PASSWORD` variable (`git diff --ignore-space-at-eol --stat`: `1 file changed, 1 insertion(+)`).  
+> **Auditor Role:** Senior Software Architect, Database Engineer & Technical Documentation Specialist  
+> **Date of Audit:** October 23, 2026  
 
 ---
 
-## 2. Executive Summary
+## 1. Executive Summary
 
-UniFlow is a departmental academic operations platform designed to coordinate faculty administrative responsibilities, course teaching loads, student assignment deadlines, and department-level resource allocation. The core architectural philosophy of UniFlow is **active mathematical workload balancing**: unlike traditional administrative software or academic ERPs (e.g., Fedena, openSIS) that merely record entries, UniFlow algorithmically computes cumulative workload scores, intercepts overloading actions prior to database commit, and provides automated, conflict-free alternatives.
+**UniFlow** is an academic resource and workload governance web platform designed for higher-education engineering and computer applications departments (specifically tailored to autonomous institution frameworks such as TKM College of Engineering, Regulations 2023). 
 
-The system encompasses four user tiers:
-1. **Super Admin:** Department configuration, HOD tenure provisioning, course and curriculum directories, user enrollment.
-2. **Head of Department (HOD):** Faculty workload monitoring via dynamic Chart.js analytics, threshold-enforced administrative task delegation (15-point ceiling), automated alternative faculty and date discovery, and deliverable review.
-3. **Faculty Member:** Active HOD task tracking, deliverable file submission with remarks, academic course declaration (L-T-P-J workload formulation), and workload-aware student assignment creation with collision prevention.
-4. **Student:** Academic profile and enrolled course visibility, dynamic weekly workload gauge (progress bar with color-coded advisory), deadline tracking, and interactive online assignment turn-in.
-
----
-
-## 3. Evidence Categories Maintained in this Audit
-
-To ensure academic and technical integrity, all facts, capabilities, and claims across this documentation handoff are strictly categorized:
-
-| Category Tag | Definition | Audit Criterion |
-| :--- | :--- | :--- |
-| **`[VERIFIED]`** | Directly supported by source code, database schema, git commit logs, or reproducible execution in this workspace. | Code path, SQL table, or commit hash is explicitly cited and verified. |
-| **`[DOCUMENTED BUT UNVERIFIED]`** | Stated in student project diaries, PowerPoint presentation slides, or prior discussions, but lacks backend implementation or reproducible logs. | Acknowledged as proposed or mocked; gaps and missing elements are recorded. |
-| **`[PROPOSED]`** | Planned enhancements, future roadmap items, or suggested architectural refactorings. | Explicitly distinguished from running features. |
+The platform addresses three core institutional challenges:
+1. **Administrative Task Allocation Governance:** Ensuring departmental task assignments (accreditation files, question paper drafting, lab evaluations) distributed by the Head of Department (HOD) do not exceed faculty bandwidth (enforced via a 15-point active workload ceiling).
+2. **Student Assignment Collision Mitigation:** Preventing multiple course instructors from piling heavy deadlines onto the same student cohort on the same calendar day or week (enforced via a 10-point daily and 18-point rolling 7-day weekly collision detection engine).
+3. **Multi-Faceted Faculty Academic Workload Formulation:** Quantifying academic teaching, laboratory supervision, continuous assessment, and institutional service into standardized workload units using course L-T-P-J metrics and experience multipliers.
 
 ---
 
-## 4. Documentation Dossier Directory & File Index
+## 2. Core Stakeholders & Role Architecture
 
-This handoff is partitioned into 9 specialized, evidence-grounded technical dossiers:
+The UniFlow codebase defines four user personas:
 
-| Dossier File | Primary Content & Purpose | Key Evidence Base |
-| :--- | :--- | :--- |
-| [**`00_project_overview.md`**](file:///c:/Users/Jenee/Downloads/TKM/Project/UniFlow/documentation_handoff/00_project_overview.md) | Executive summary, metadata, file index, problem statement, and evidence taxonomy. | Project repository, Git metadata, Diary records. |
-| [**`01_architecture_and_stack.md`**](file:///c:/Users/Jenee/Downloads/TKM/Project/UniFlow/documentation_handoff/01_architecture_and_stack.md) | Verified 3-tier architecture, runtime environment, dependencies, request lifecycles, and design system. | `backend/package.json`, `server.js`, `UI/css/`. |
-| [**`02_database_design.md`**](file:///c:/Users/Jenee/Downloads/TKM/Project/UniFlow/documentation_handoff/02_database_design.md) | Data dictionary of all 15 PostgreSQL tables, ER diagram (Mermaid), keys, constraints, and relationships. | `backend/schema.sql`, migration scripts, `seed.js`. |
-| [**`03_api_catalogue.md`**](file:///c:/Users/Jenee/Downloads/TKM/Project/UniFlow/documentation_handoff/03_api_catalogue.md) | Verified REST API catalogue (21 routes), HTTP methods, headers, payloads, status codes, and callers. | `backend/src/routes/`, `backend/src/controllers/`. |
-| [**`04_workload_algorithms.md`**](file:///c:/Users/Jenee/Downloads/TKM/Project/UniFlow/documentation_handoff/04_workload_algorithms.md) | Deep mathematical models, formulas, pseudocode, and worked examples for the 3 workload engines. | `workloadController.js`, `facultyController.js`. |
-| [**`05_module_implementation.md`**](file:///c:/Users/Jenee/Downloads/TKM/Project/UniFlow/documentation_handoff/05_module_implementation.md) | Detailed functional analysis of Admin, HOD, Faculty, and Student modules with UI workflows. | `UI/*/js/*.js`, `UI/*/dashboard.html`. |
-| [**`06_testing_and_limitations.md`**](file:///c:/Users/Jenee/Downloads/TKM/Project/UniFlow/documentation_handoff/06_testing_and_limitations.md) | Testing inventory, concurrency analysis, security vulnerabilities, edge cases, and known defects. | `backend/test.js`, `simulate_workload.js`, code audit. |
-| [**`07_git_contributions.md`**](file:///c:/Users/Jenee/Downloads/TKM/Project/UniFlow/documentation_handoff/07_git_contributions.md) | Git branch topology, commit history, and objective contribution matrix between Jeneesh and Kiran. | Git commit logs, diff stats, author headers. |
-| [**`08_unverified_claims.md`**](file:///c:/Users/Jenee/Downloads/TKM/Project/UniFlow/documentation_handoff/08_unverified_claims.md) | Rigorous reconciliation of presentation slides and diary statements against active codebase reality. | PPT slides, Scrum diary vs. active source code. |
+| Role | Server Enforcement Status | Client Portal Location | Key Implemented Features | Client-Side Mocked / Unconnected Features |
+| :--- | :--- | :--- | :--- | :--- |
+| **Head of Department (HOD)** | **FRONTEND ONLY** (Verified: all routes accept any valid JWT without role verification) | `UI/hod/dashboard.html` (`UI/hod/js/hod.js`) | • Workload Chart.js visualization (`GET /api/workload/hod/summary`)<br>• Workload-aware task delegation with alternative recommendations (`POST /api/workload/suggest`, `POST /api/workload/assign`)<br>• Multi-domain department workload analytics (`GET /api/workload/department/hod/summary`) | • Timetable Matrix scheduling (`localStorage`)<br>• Student Grievance Resolution modal (`localStorage`)<br>• Department Chat (`localStorage`) |
+| **Faculty Member** | **FRONTEND ONLY** (Authentication verified via JWT; route permissions not checked by role) | `UI/faculty/dashboard.html` (`UI/faculty/js/faculty.js`) | • HOD Task monitoring and status toggle (`GET /api/faculty/tasks`, `PATCH /api/faculty/tasks/:id/status`)<br>• L-T-P-J Academic Class declaration with 5-table write (`POST /api/workload/classes`)<br>• Student Assignment publishing with Collision Detection (`POST /api/faculty/student-assignments/check`, `POST /api/faculty/student-assignments`)<br>• Department responsibility tracking (`GET/POST /api/workload/department/faculty`) | • Timetable view (`localStorage`)<br>• Grievance filing (`localStorage`)<br>• Deliverable file upload (NOT IMPLEMENTED in code) |
+| **Student** | **FRONTEND ONLY** | `UI/student/dashboard.html` (`UI/student/js/student.js`) | • Student Dashboard overview (`GET /api/student/dashboard`)<br>• Enrolled course listing (`GET /api/student/courses`)<br>• Course assignment tracking (`GET /api/student/assignments`)<br>• Assignment text/file turn-in (`PATCH /api/student/assignments/:id/submit`) | • Semester Timetable (`localStorage`)<br>• Attendance progress (`localStorage`)<br>• Performance / GPA trends (`localStorage`) |
+| **Administrator** | **FRONTEND ONLY** (No API endpoints exist for admin) | `UI/admin/dashboard.html` (`UI/admin/js/admin.js`) | None connected to backend. | • Department Management (`localStorage`)<br>• Course Management (`localStorage`)<br>• User Management & Credential Reset (`localStorage`)<br>• HOD Assignment Directory (`localStorage`) |
 
 ---
 
-## 5. Summary of System Maturity & Verification Findings
+## 3. High-Level System Architecture
 
-1. **Backend Integration Maturity:**
-   - **HOD Module:** Fully integrated with PostgreSQL backend for task allocation, workload suggestions, conflict interception, and Chart.js analytics summaries (`/api/workload/*`).
-   - **Faculty Module:** Fully integrated with PostgreSQL backend for live task synchronization, status toggling, deliverable file uploads, subject allocation, student assignment collision detection, and academic workload calculation (`/api/faculty/*`, `/api/workload/classes`).
-   - **Student Module:** Fully integrated with PostgreSQL backend for dashboard statistics, enrolled courses, upcoming assignments, and real-time assignment turn-in submissions (`/api/student/*`).
-   - **Admin Module:** `[DOCUMENTED BUT UNVERIFIED AS REST API]` Currently implemented purely on the client side using browser `localStorage` (`uniflow_dataStore`). No backend `/api/admin/*` routes exist in `server.js`.
-2. **Database Schema Integrity:**
-   - 10 relational tables in `schema.sql` handle users, departments, courses, subjects, allocations, tasks, students, assignments, and submissions.
-   - 5 dedicated analytical tables handle academic workload calculations (`teaching_loads`, `paper_and_assignment_setting`, `preparation_and_course_factors`, `evaluation_units`, `workload_master`).
-3. **Automated Testing Reality:**
-   - No automated test runner (Jest, Mocha, Supertest, XUnit) or CI/CD pipeline (Jenkins) exists in `package.json`.
-   - Ad-hoc database and integration test scripts exist: `backend/test.js`, `backend/simulate_workload.js`, `backend/clear_workload.js`.
-   - Presentation metrics (`26ms`, `42ms`) are unverified simulated benchmarks.
+UniFlow follows a classic decoupled client-server architecture:
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        WEB BROWSER CLIENTS                             │
+│                                                                        │
+│   [ Admin Console ]     [ HOD Console ]   [ Faculty Portal ]  [ Student Portal ]
+│   (HTML/CSS/JS)         (HTML/CSS/JS)     (HTML/CSS/JS)       (HTML/CSS/JS)
+│                                                                        │
+└────────────────────────────────────┬───────────────────────────────────┘
+                                     │ HTTP / REST (Fetch API)
+                                     │ Origin: http://localhost:5000 (Static Express)
+                                     │ or http://127.0.0.1:5500 (Live Server)
+                                     ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        NODE.JS / EXPRESS 5 BACKEND                     │
+│                             (Port 5000)                                │
+│                                                                        │
+│  [ express.json() (100KB limit) ] ──► [ cors() ] ──► [ Static UI Serv ]│
+│                                                                        │
+│  Route Handlers:                                                       │
+│    • /api/auth       (authRoutes.js)                                   │
+│    • /api/workload   (workloadRoutes.js)                               │
+│    • /api/faculty    (facultyRoutes.js)                                │
+│    • /api/student    (studentRoutes.js)                                │
+│                                                                        │
+│  Security Layer:                                                       │
+│    • authMiddleware.js: authenticateToken (JWT Signature Verification) │
+│    • bcryptjs: Salt rounds = 10                                        │
+│                                                                        │
+│  Workload Calculation Engines:                                         │
+│    • Engine A: HOD Task Delegation (Threshold = 15 pts)                │
+│    • Engine B: Student Collision Engine (Daily = 10, Weekly = 18 pts)  │
+│    • Engine C: L-T-P-J Course Workload Formulation (5 relational writes)│
+└────────────────────────────────────┬───────────────────────────────────┘
+                                     │ pg Client Pool (node-postgres)
+                                     │ Port 5432
+                                     ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                      POSTGRESQL RELATIONAL DATABASE                    │
+│                               (uniflow)                                │
+│                                                                        │
+│   Active Relational Core (18 Tables in schema.sql & initWorkloadTables)│
+│   ------------------------------------------------------------------   │
+│   • Identity & Academics: users, departments, user_departments,        │
+│                           courses, subjects, subject_faculty           │
+│   • Administrative Tasks: tasks                                        │
+│   • Student Portal:       students, student_assignments,               │
+│                           student_assignment_submissions               │
+│   • Academic Workload:    teaching_loads, paper_and_assignment_setting, │
+│                           preparation_and_course_factors,              │
+│                           evaluation_units, workload_master            │
+│   • Multi-Domain Service: department_roles_master,                     │
+│                           department_tasks_master,                     │
+│                           faculty_department_workload                  │
+│                                                                        │
+│   Legacy / Prototype Tables (9 Unconnected tables in live DB):         │
+│   attendance, chat_threads, chat_participants, messages, grievances,   │
+│   marks, timetable, timetable_faculty, student_enrollments             │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 4. Key Implementation Realities vs Earlier Documentation Claims
+
+A rigorous audit comparing the actual source code with earlier unverified handoff documentation (`00`–`08`) revealed critical contradictions that have been fully resolved:
+
+1. **Faculty Deliverable File Upload:**
+   - *Old Claim:* Base64 deliverable file upload to `backend/uploads/` with static routing at `/uploads`.
+   - *Verified Reality:* **NOT IMPLEMENTED.** No upload endpoint, no `multer`, no `fs.writeFileSync`, no static `/uploads` handler exists on any commit. The faculty interface simply provides "Start", "Mark Done", and "Reopen" buttons issuing `PATCH /api/faculty/tasks/:id/status`.
+2. **Server-Side Role-Based Authorization:**
+   - *Old Claim:* Strict enforcement via `requireHOD`, `requireFaculty`, `requireStudent`.
+   - *Verified Reality:* **ABSENT ON SERVER.** `authMiddleware.js` exports only `authenticateToken`, which validates JWT cryptographic signatures. Role checking is performed solely client-side in browser JS. A student token can call HOD and Faculty endpoints directly.
+3. **JSON Body Parsing Limit:**
+   - *Old Claim:* 50 MB body limit (`express.json({ limit: '50mb' })`).
+   - *Verified Reality:* Plain `app.use(express.json())` is configured in `backend/src/server.js:20`. The effective default limit is **100 KB**.
+4. **Environment Fallback Secrets:**
+   - *Old Claim:* Hardcoded fallback JWT secrets and fallback DB connection strings.
+   - *Verified Reality:* Neither `authMiddleware.js` nor `authController.js` nor `db.js` contains fallback secrets. If `JWT_SECRET` is unset, `jwt.sign()` and `jwt.verify()` throw fatal exceptions resulting in HTTP 500 / 401 errors.
+5. **Student Collision Weekly Window:**
+   - *Old Claim:* $\pm 6$ days Monday–Sunday calendar window.
+   - *Verified Reality:* A **rolling 7-day window** defined as `due_date BETWEEN ($3::date - INTERVAL '3 days') AND ($3::date + INTERVAL '3 days')`. Alternative date calculations scan the next 14 calendar days but evaluate only daily workload ($\le 10$), omitting weekly checks.
+6. **Database Schema Table Count:**
+   - *Old Claim:* Presentation slides claimed "16 tables"; older documentation vacillated between 10 and 16.
+   - *Verified Reality:* The active schema defines **18 tables**. The live PostgreSQL database contains **27 tables** due to 9 leftover prototype tables (`attendance`, `chat_threads`, `chat_participants`, `messages`, `grievances`, `marks`, `timetable`, `timetable_faculty`, `student_enrollments`) documented in `changes.docx`.

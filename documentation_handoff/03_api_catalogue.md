@@ -1,489 +1,435 @@
-# UniFlow — Verified RESTful API Catalogue
+# UniFlow — Verified API Catalogue (v2)
 
-This catalogue documents all 20 active REST endpoints and static routes mounted on the UniFlow Express backend (`http://localhost:5000`). Every route is verified against `server.js`, route definitions, controller logic, and frontend callers.
+> **Document Status:** VERIFIED AGAINST ROUTE FILES & LIVE TESTING  
+> **Audit Target:** Git Commit `6a2fff722c3d8cab187c5e95882cd1c894d185c6` (Branch: `main`)  
+> **Auditor Role:** Senior Software Architect & API Auditor  
+> **Date of Audit:** October 23, 2026  
 
 ---
 
-## 1. System & Authentication Endpoints
+## 1. Registered API Endpoints (Verified in Code)
 
-### 1.1 `GET /`
-- **Purpose:** Server heartbeat / health check.
-- **Access Level:** Public (No authentication required).
-- **Controller:** Inline in `server.js`.
-- **Response `200 OK`:**
-  ```json
-  { "message": "UniFlow Backend is running!" }
-  ```
+Every endpoint documented below is actively registered in Express route files and verified through real HTTP requests during Phase 4 audit execution.
 
-### 1.2 `GET /api/db-test`
-- **Purpose:** Verifies active PostgreSQL connection pooling.
-- **Access Level:** Public.
-- **Controller:** Inline in `server.js`.
-- **Response `200 OK`:**
-  ```json
-  { "success": true, "message": "Database connection successful", "time": "2026-10-22T18:15:00.000Z" }
-  ```
-- **Error `500 Internal Server Error`:**
-  ```json
-  { "success": false, "message": "Database connection failed" }
-  ```
+### Summary Table
 
-### 1.3 `POST /api/auth/login`
-- **Purpose:** Authenticates user credentials and issues signed JWT.
-- **Access Level:** Public.
-- **Controller:** `authController.js` $\rightarrow$ `login`.
-- **Caller:** `UI/js/login.js` on form submit.
+| Method | Exact Path | Middleware | Who Can Really Call (Server) | Calling Frontend Function | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/` | None | Public | Browser direct navigation | **IMPLEMENTED** |
+| `GET` | `/api/db-test` | None | Public | Health checks | **IMPLEMENTED** |
+| `POST` | `/api/auth/login` | None | Public | `UI/js/login.js:loginForm.submit` | **IMPLEMENTED** |
+| `GET` | `/api/workload/subjects` | `authenticateToken` | Any Authenticated User | `UI/hod/js/hod.js:openTaskModal` | **IMPLEMENTED** |
+| `GET` | `/api/workload/faculty` | `authenticateToken` | Any Authenticated User | `UI/hod/js/hod.js:renderOverview` | **IMPLEMENTED** |
+| `GET` | `/api/workload/tasks` | `authenticateToken` | Any Authenticated User | `UI/hod/js/hod.js:fetchAssignedTasks` | **IMPLEMENTED** |
+| `POST` | `/api/workload/suggest` | `authenticateToken` | Any Authenticated User | `UI/hod/js/hod.js:triggerWorkloadSuggestion` | **IMPLEMENTED** |
+| `POST` | `/api/workload/assign` | `authenticateToken` | Any Authenticated User | `UI/hod/js/hod.js:commitTaskAssignment` | **IMPLEMENTED** |
+| `POST` | `/api/workload/classes` | `authenticateToken` | Any Authenticated User | `UI/faculty/js/faculty.js:addClassForm.submit` | **IMPLEMENTED** |
+| `GET` | `/api/workload/hod/summary` | `authenticateToken` | Any Authenticated User | `UI/hod/js/hod.js:fetchWorkloadSummary` | **IMPLEMENTED** |
+| `GET` | `/api/workload/catalogs` | None | Public | `UI/faculty/js/faculty.js:initWorkloadCatalogs` | **IMPLEMENTED** |
+| `GET` | `/api/workload/department/master` | None | Public | `UI/hod/js/hod.js:fetchDeptMaster` | **IMPLEMENTED** |
+| `GET` | `/api/workload/department/faculty` | `flexibleAuth` | Public (fallback Grace H.) or Auth | `UI/faculty/js/faculty.js:renderFacultyDeptWorkload` | **IMPLEMENTED** |
+| `POST` | `/api/workload/department/faculty` | `flexibleAuth` | Public (fallback Grace H.) or Auth | `UI/faculty/js/faculty.js:saveDeptWorkloadTask` | **IMPLEMENTED** |
+| `DELETE`| `/api/workload/department/faculty/:id` | `flexibleAuth` | Public (fallback Grace H.) or Auth | `UI/faculty/js/faculty.js:deleteDeptWorkloadTask` | **IMPLEMENTED** |
+| `GET` | `/api/workload/department/hod/summary` | `flexibleHodAuth` | Public (fallback Dr. Turing) or Auth | `UI/hod/js/hod.js:fetchDeptHodSummary` | **IMPLEMENTED** |
+| `GET` | `/api/faculty/tasks` | `authenticateToken` | Any Authenticated User | `UI/faculty/js/faculty.js:fetchFacultyTasks` | **IMPLEMENTED** |
+| `PATCH`| `/api/faculty/tasks/:id/status` | `authenticateToken` | Any Authenticated User (task owner) | `UI/faculty/js/faculty.js:updateFacultyTaskStatus` | **IMPLEMENTED** |
+| `GET` | `/api/faculty/subjects` | `authenticateToken` | Any Authenticated User | `UI/faculty/js/faculty.js:fetchFacultySubjects` | **IMPLEMENTED** |
+| `POST` | `/api/faculty/student-assignments/check` | `authenticateToken` | Any Authenticated User (assigned teacher) | `UI/faculty/js/faculty.js:checkCollisionBtn.click` | **IMPLEMENTED** |
+| `POST` | `/api/faculty/student-assignments` | `authenticateToken` | Any Authenticated User (assigned teacher) | `UI/faculty/js/faculty.js:publishAssignmentBtn.click` | **IMPLEMENTED** |
+| `GET` | `/api/faculty/student-assignments` | `authenticateToken` | Any Authenticated User | `UI/faculty/js/faculty.js:fetchMyStudentAssignments` | **IMPLEMENTED** |
+| `GET` | `/api/student/dashboard` | `authenticateToken` | Any Authenticated User (reads req.user) | `UI/student/js/student.js:loadDashboard` | **IMPLEMENTED** |
+| `GET` | `/api/student/assignments` | `authenticateToken` | Any Authenticated User (reads req.user) | `UI/student/js/student.js:loadAssignments` | **IMPLEMENTED** |
+| `GET` | `/api/student/courses` | `authenticateToken` | Any Authenticated User (reads req.user) | `UI/student/js/student.js:loadCourses` | **IMPLEMENTED** |
+| `PATCH`| `/api/student/assignments/:id/submit` | `authenticateToken` | Any Authenticated User (reads req.user) | `UI/student/js/student.js:turnInForm.submit` | **IMPLEMENTED** |
+
+---
+
+## 2. Detailed Endpoint Specifications
+
+### 2.1 Authentication Subsystem
+
+#### `POST /api/auth/login`
+- **Controller:** `backend/src/controllers/authController.js:11` (`login`)
+- **Route:** `backend/src/routes/authRoutes.js:9`
+- **Middleware:** None (Public)
 - **Request Body:**
   ```json
   {
+    "email": "faculty@uniflow.edu",
+    "password": "faculty123"
+  }
+  ```
+- **Validation:**
+  - `!email || !password` $\rightarrow$ HTTP 400 Bad Request: `{"success": false, "message": "Email and password are required"}`.
+  - User not found in DB $\rightarrow$ HTTP 401 Unauthorized: `{"success": false, "message": "Invalid email or password"}`.
+  - Password mismatch via `bcrypt.compare` $\rightarrow$ HTTP 401 Unauthorized: `{"success": false, "message": "Invalid email or password"}`.
+- **Database Query:**
+  ```sql
+  SELECT id, custom_id, name, email, password_hash, role, is_hod 
+  FROM users WHERE LOWER(email) = LOWER($1)
+  ```
+- **Success Response (HTTP 200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "Login successful",
+    "token": "<JWT_STRING>",
+    "user": {
+      "id": 2,
+      "customId": "FAC001",
+      "name": "Grace Hopper",
       "email": "faculty@uniflow.edu",
-      "password": "faculty123"
+      "role": "faculty",
+      "isHOD": false
+    }
   }
   ```
-- **Validation & Logic:**
-  - Validates `email` and `password` presence.
-  - Queries `SELECT * FROM users WHERE email = $1`.
-  - Executes `bcrypt.compare(password, user.password_hash)`.
-  - Generates JWT containing `{ userId, email, role, isHod }`, valid for 24 hours.
-- **Response `200 OK`:**
-  ```json
-  {
-      "success": true,
-      "message": "Login successful",
-      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-      "user": {
-          "id": 2,
-          "customId": "FAC001",
-          "name": "Grace Hopper",
-          "email": "faculty@uniflow.edu",
-          "role": "faculty",
-          "isHod": false
-      }
-  }
-  ```
-- **Error `400 Bad Request`:** Missing email or password.
-- **Error `401 Unauthorized`:** User not found or password hash mismatch (`Invalid email or password`).
+- **JWT Payload Details:** `{ userId: user.id, role: frontendRole, isHod: user.is_hod, exp: 1d }`.
 
 ---
 
-## 2. HOD Workload & Administrative Endpoints (`/api/workload/*`)
+### 2.2 HOD Workload Governance Subsystem (Engine A)
 
-### 2.1 `GET /api/workload/subjects`
-- **Purpose:** Fetches subjects scoped by faculty, course, semester, or HOD department.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `workloadController.js` $\rightarrow$ `getSubjects`.
-- **Query Parameters:** `?faculty_id=2`, `?course_id=1`, `?semester=5`.
-- **Caller:** `UI/hod/js/hod.js` $\rightarrow$ `renderTasks()`.
-- **Response `200 OK`:**
+#### `GET /api/workload/faculty`
+- **Controller:** `backend/src/controllers/workloadController.js:94` (`getFaculty`)
+- **Route:** `backend/src/routes/workloadRoutes.js:30`
+- **Middleware:** `authenticateToken`
+- **Authorization Check:** None on server (any valid JWT accepted).
+- **Database Query:** Aggregates active workload difficulty from `tasks` table per faculty member:
+  ```sql
+  SELECT u.id, u.custom_id, u.name, u.email, u.role, u.is_hod,
+         COALESCE(SUM(t.difficulty), 0) AS current_workload
+  FROM users u
+  LEFT JOIN tasks t ON u.id = t.assigned_to 
+       AND (t.status IS NULL OR t.status != 'completed')
+       AND t.scheduled_date <= CURRENT_DATE 
+       AND COALESCE(t.deadline, t.scheduled_date) >= CURRENT_DATE
+  WHERE u.role = 'faculty' AND u.is_hod = false
+  GROUP BY u.id, u.custom_id, u.name, u.email, u.role, u.is_hod
+  ORDER BY u.name ASC
+  ```
+- **Success Response (HTTP 200 OK):**
   ```json
   {
-      "success": true,
-      "subjects": [
-          {
-              "id": 2,
-              "name": "Operating Systems",
-              "code": "CS301",
-              "semester": 5,
-              "credits": 4,
-              "course_id": 1,
-              "course_name": "B.Tech Computer Science and Engineering",
-              "department_name": "Computer Science",
-              "faculty": [{ "id": 2, "name": "Grace Hopper", "email": "faculty@uniflow.edu" }]
-          }
-      ]
+    "success": true,
+    "faculty": [
+      {
+        "id": 2,
+        "custom_id": "FAC001",
+        "name": "Grace Hopper",
+        "email": "faculty@uniflow.edu",
+        "current_workload": 9,
+        "threshold": 15
+      }
+    ]
   }
   ```
 
-### 2.2 `GET /api/workload/faculty`
-- **Purpose:** Retrieves faculty list with total active workload points for HOD dropdowns.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `workloadController.js` $\rightarrow$ `getFaculty`.
-- **Caller:** `UI/hod/js/hod.js` $\rightarrow$ `renderTasks()`.
-- **Response `200 OK`:**
-  ```json
-  {
-      "success": true,
-      "faculty": [
-          {
-              "id": 2,
-              "custom_id": "FAC001",
-              "name": "Grace Hopper",
-              "email": "faculty@uniflow.edu",
-              "total_active_workload": 9,
-              "assigned_subjects": [{ "id": 2, "name": "Operating Systems", "code": "CS301" }]
-          }
-      ],
-      "threshold": 15
-  }
-  ```
-
-### 2.3 `GET /api/workload/tasks`
-- **Purpose:** Fetches all active administrative tasks across the department.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `workloadController.js` $\rightarrow$ `getTasks`.
-- **Caller:** `UI/hod/js/hod.js` $\rightarrow$ `renderTasks()`.
-- **Response `200 OK`:**
-  ```json
-  {
-      "success": true,
-      "tasks": [
-          {
-              "id": 1,
-              "description": "Prepare Midterm Question Paper for OS",
-              "difficulty": 5,
-              "deadline": "2026-09-06",
-              "scheduled_date": "2026-09-02",
-              "status": "pending",
-              "creator_name": "Dr. Alan Turing",
-              "assignee_name": "Grace Hopper",
-              "subject_name": "Operating Systems",
-              "faculty_remark": "Draft questions formulated.",
-              "attachment_url": "http://localhost:5000/uploads/1725150000000_OS_Draft.pdf"
-          }
-      ]
-  }
-  ```
-
-### 2.4 `POST /api/workload/suggest`
-- **Purpose:** Evaluates faculty capacity against 15-pt limit and generates alternative dates and peer faculty.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `workloadController.js` $\rightarrow$ `suggestTask`.
-- **Caller:** `UI/hod/js/hod.js` on task assignment form submit.
+#### `POST /api/workload/suggest`
+- **Controller:** `backend/src/controllers/workloadController.js:213` (`suggestTask`)
+- **Route:** `backend/src/routes/workloadRoutes.js:44`
+- **Middleware:** `authenticateToken`
 - **Request Body:**
   ```json
   {
-      "subject_id": 2,
-      "assigned_to": 2,
-      "description": "NAAC Criteria 3 Audit File Preparation",
-      "difficulty": 8,
-      "scheduled_date": "2026-09-02",
-      "deadline": "2026-09-06"
+    "subject_id": 2,
+    "assigned_to": 2,
+    "description": "Prepare Midterm Exam Papers",
+    "difficulty": 4,
+    "scheduled_date": "2026-11-01",
+    "deadline": "2026-11-05"
   }
   ```
-- **Business Logic:**
-  - Calculates overlapping active workload: `SUM(difficulty)` where `scheduled_date <= end_date AND deadline >= start_date AND status != 'completed'`.
-  - If `current + difficulty <= 15`: `can_assign = true`.
-  - If `current + difficulty > 15`: `can_assign = false`; initiates `generate_series` date scan (next 30 days) and peer faculty query.
-- **Response `200 OK` (Overload Example):**
+- **Validation:**
+  - Missing fields $\rightarrow$ HTTP 400 Bad Request.
+  - `difficulty < 1 || difficulty > 10` $\rightarrow$ HTTP 400 Bad Request.
+- **Engine Logic:**
+  - Evaluates active overlapping workload for `assigned_to` within `[scheduled_date, deadline]`.
+  - If `resultingWorkload <= 15`: `can_assign = true`.
+  - If `resultingWorkload > 15`: `can_assign = false`; discovers up to 5 alternative faculty members and up to 3 alternative date intervals.
+- **Success Response (HTTP 200 OK):**
   ```json
   {
-      "success": true,
-      "can_assign": false,
-      "message": "Faculty workload would exceed the maximum threshold of 15 points.",
-      "selected_faculty": { "id": 2, "name": "Grace Hopper", "current_workload": 9, "added_difficulty": 8, "resulting_workload": 17 },
-      "threshold": 15,
-      "recommendations": {
-          "alternative_dates": [
-              { "scheduled_date": "2026-09-09", "deadline": "2026-09-13", "existing_workload": 4, "resulting_workload": 12 }
-          ],
-          "alternative_faculty": [
-              { "id": 3, "name": "Linus Torvalds", "current_workload": 0, "resulting_workload": 8, "teaches_subject": true }
-          ]
-      }
+    "success": true,
+    "can_assign": true,
+    "message": "Grace Hopper is available for this assignment.",
+    "selected_faculty": {
+      "id": 2,
+      "name": "Grace Hopper",
+      "current_workload": 0,
+      "added_difficulty": 4,
+      "resulting_workload": 4
+    },
+    "threshold": 15,
+    "recommendations": {
+      "alternative_dates": [],
+      "alternative_faculty": []
+    }
   }
   ```
 
-### 2.5 `POST /api/workload/assign`
-- **Purpose:** Strictly verifies threshold and commits task assignment to PostgreSQL.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `workloadController.js` $\rightarrow$ `assignTask`.
-- **Request Body:** Same as `/api/workload/suggest`.
-- **Response `201 Created`:**
-  ```json
-  {
-      "success": true,
-      "message": "Task approved and assigned successfully.",
-      "task": { "id": 14, "description": "...", "status": "approved", "difficulty": 5 },
-      "workload": { "previous": 4, "added": 5, "total": 9, "threshold": 15 }
-  }
-  ```
-- **Error `409 Conflict` (Strict Block):**
-  ```json
-  {
+#### `POST /api/workload/assign`
+- **Controller:** `backend/src/controllers/workloadController.js:447` (`assignTask`)
+- **Route:** `backend/src/routes/workloadRoutes.js:51`
+- **Middleware:** `authenticateToken`
+- **Request Body:** Same as `suggestTask`.
+- **Enforcement Check:**
+  - Re-evaluates active overlapping workload in DB.
+  - If `current_workload + taskDifficulty > 15`:
+    **Rejects with HTTP 409 Conflict:**
+    ```json
+    {
       "success": false,
       "can_assign": false,
-      "message": "Workload limit exceeded. Faculty current workload is 9 pts. Adding 8 pts reaches 17 pts (Maximum allowed: 15 pts).",
+      "message": "Workload limit exceeded. Faculty current workload is 9 pts. Adding 10 pts reaches 19 pts (Maximum allowed: 15 pts).",
+      "current_workload": 9,
+      "requested_difficulty": 10,
+      "resulting_workload": 19,
       "threshold": 15
-  }
-  ```
+    }
+    ```
+  - If within threshold: Inserts task into `tasks` table with `status = 'approved'` and returns HTTP 201 Created.
 
-### 2.6 `POST /api/workload/classes`
-- **Purpose:** Computes and saves L-T-P-J academic workload units across 5 database tables.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `workloadController.js` $\rightarrow$ `addClass`.
-- **Caller:** `UI/faculty/js/faculty.js` $\rightarrow$ `#addClassForm` submit.
+---
+
+### 2.3 Academic Course Workload Subsystem (Engine C)
+
+#### `POST /api/workload/classes`
+- **Controller:** `backend/src/controllers/workloadController.js:574` (`addClass`)
+- **Route:** `backend/src/routes/workloadRoutes.js:58`
+- **Middleware:** `authenticateToken`
+- **Atomicity:** Wrapped in `BEGIN` / `COMMIT` / `ROLLBACK` database transaction.
 - **Request Body:**
   ```json
   {
-      "programName": "B.Tech Computer Science",
-      "subjectName": "Advanced Database Management Systems",
+    "programName": "B.Tech Computer Science and Engineering",
+    "semester": 5,
+    "courseType": "Core Theory",
+    "ltpjCode": "3-1-0-0",
+    "role": "Theory",
+    "subjectName": "Compiler Design",
+    "subjectCode": "CS502",
+    "studentsClass": 60,
+    "studentsInLab": 0,
+    "studentsInProject": 0,
+    "priorExperience": true
+  }
+  ```
+- **Database Operations:** Writes atomically to 5 tables:
+  1. `courses` (if program does not exist)
+  2. `subjects` (new subject record)
+  3. `subject_faculty` (allocation link)
+  4. `teaching_loads`
+  5. `paper_and_assignment_setting`
+  6. `preparation_and_course_factors`
+  7. `evaluation_units`
+  8. `workload_master`
+- **Success Response (HTTP 200 OK):** `{"success": true, "message": "Class added successfully."}`.
+
+---
+
+### 2.4 Faculty Subsystem & Student Collision Detection (Engine B)
+
+#### `GET /api/faculty/tasks`
+- **Controller:** `backend/src/controllers/facultyController.js:10` (`getMyTasks`)
+- **Route:** `backend/src/routes/facultyRoutes.js:14`
+- **Middleware:** `authenticateToken`
+- **Database Query:** Fetches tasks where `assigned_to = req.user.userId`.
+- **Success Response (HTTP 200 OK):**
+  ```json
+  {
+    "success": true,
+    "tasks": [
+      {
+        "id": 1,
+        "description": "Prepare Midterm Question Paper for OS",
+        "difficulty": 5,
+        "deadline": "2026-09-06",
+        "scheduled_date": "2026-09-02",
+        "status": "pending",
+        "creator_name": "Dr. Alan Turing",
+        "subject_name": "Operating Systems"
+      }
+    ],
+    "summary": {
+      "totalTasks": 1,
+      "activeCount": 1,
+      "completedCount": 0,
+      "currentWorkload": 5,
+      "threshold": 15
+    }
+  }
+  ```
+
+#### `PATCH /api/faculty/tasks/:id/status`
+- **Controller:** `backend/src/controllers/facultyController.js:70` (`updateTaskStatus`)
+- **Route:** `backend/src/routes/facultyRoutes.js:15`
+- **Middleware:** `authenticateToken`
+- **Request Body:** `{"status": "in_progress"}` or `{"status": "completed"}` or `{"status": "pending"}`.
+- **Validation:** `validStatuses = ['pending', 'in_progress', 'completed', 'active', 'approved']`.
+- **Database Operation:**
+  ```sql
+  UPDATE tasks SET status = $1 
+  WHERE id = $2 AND assigned_to = $3 
+  RETURNING *
+  ```
+- **Success Response (HTTP 200 OK):**
+  ```json
+  {
+    "success": true,
+    "message": "Task status updated to \"in_progress\".",
+    "task": { "id": 1, "status": "in_progress" }
+  }
+  ```
+
+#### `POST /api/faculty/student-assignments/check`
+- **Controller:** `backend/src/controllers/facultyController.js:171` (`checkStudentWorkload`)
+- **Route:** `backend/src/routes/facultyRoutes.js:19`
+- **Middleware:** `authenticateToken`
+- **Request Body:**
+  ```json
+  {
+    "subject_id": 2,
+    "difficulty": 5,
+    "due_date": "2026-11-10"
+  }
+  ```
+- **Collision Rules:**
+  - Daily limit: `dailyTotal + difficulty > 10`
+  - Weekly limit: `weeklyTotal + difficulty > 18` (across rolling window `due_date ± 3 days`)
+- **Collision Response (HTTP 200 OK):**
+  ```json
+  {
+    "success": true,
+    "can_assign": false,
+    "is_overloaded": true,
+    "reason": "Daily workload threshold exceeded",
+    "target_class": {
+      "course_id": 2,
+      "course_name": "B.Tech Computer Science and Engineering",
       "semester": 5,
-      "courseType": "Theory course embedded with tutorial & practical",
-      "ltpjCode": "2-1-2-0",
-      "role": "Theory",
-      "studentsClass": 60,
-      "studentsInLab": 0,
-      "studentsInProject": 0,
-      "priorExperience": true,
-      "labModification": false
+      "subject_name": "Operating Systems"
+    },
+    "workload": {
+      "date": "2026-11-10",
+      "current_daily_workload": 8,
+      "task_difficulty": 5,
+      "resulting_daily_workload": 13,
+      "daily_threshold": 10,
+      "weekly_workload_window": 13,
+      "weekly_threshold": 18
+    },
+    "alternative_dates": [
+      {
+        "date": "2026-11-11",
+        "current_workload": 0,
+        "resulting_workload": 5,
+        "threshold": 10
+      }
+    ]
   }
   ```
-- **Response `200 OK`:**
-  ```json
-  { "success": true, "message": "Class added successfully." }
-  ```
 
-### 2.7 `GET /api/workload/hod/summary`
-- **Purpose:** Returns comprehensive rows from all 5 workload tables for Chart.js bar graph rendering and table drill-downs.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `workloadController.js` $\rightarrow$ `getHodSummary`.
-- **Caller:** `UI/hod/js/hod.js` $\rightarrow$ `fetchAndRenderHodSummary()`.
-- **Response `200 OK`:**
+#### `POST /api/faculty/student-assignments`
+- **Controller:** `backend/src/controllers/facultyController.js:338` (`assignWorkToStudents`)
+- **Route:** `backend/src/routes/facultyRoutes.js:20`
+- **Middleware:** `authenticateToken`
+- **Request Body:**
   ```json
   {
-      "success": true,
-      "workload_master": [{ "faculty_name": "Grace Hopper", "grand_total_workload_units": 42.5 }],
-      "teaching_loads": [...],
-      "paper_and_assignment_setting": [...],
-      "preparation_and_course_factors": [...],
-      "evaluation_units": [...]
+    "subject_id": 2,
+    "title": "OS Process Scheduling Simulation",
+    "description": "Implement Round Robin and Priority scheduling in C++",
+    "difficulty": 4,
+    "due_date": "2026-11-15",
+    "max_marks": 100,
+    "override_collision": false
+  }
+  ```
+- **Database Operations (Transactional `BEGIN` / `COMMIT`):**
+  1. Re-evaluates daily and weekly collision. If overloaded and `override_collision !== true`, rejects with HTTP 409 Conflict.
+  2. Inserts assignment record into `student_assignments`.
+  3. Automatically fans out rows to `student_assignment_submissions` with `status = 'pending'` for all enrolled students in that course and semester.
+- **Success Response (HTTP 201 Created):**
+  ```json
+  {
+    "success": true,
+    "message": "Assignment successfully created and distributed to 2 students.",
+    "assignment": { "id": 5, "title": "OS Process Scheduling Simulation" },
+    "students_assigned": 2
   }
   ```
 
 ---
 
-## 3. Faculty Module Endpoints (`/api/faculty/*`)
+### 2.5 Student Portal Subsystem
 
-### 3.1 `GET /api/faculty/tasks`
-- **Purpose:** Fetches all tasks assigned to logged-in faculty with active workload summary.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `facultyController.js` $\rightarrow$ `getMyTasks`.
-- **Caller:** `UI/faculty/js/faculty.js` $\rightarrow$ `fetchFacultyTasks()`.
-- **Response `200 OK`:**
+#### `GET /api/student/dashboard`
+- **Controller:** `backend/src/controllers/studentController.js:10` (`getStudentDashboard`)
+- **Route:** `backend/src/routes/studentRoutes.js:11`
+- **Middleware:** `authenticateToken`
+- **Database Query:** Identifies student from `users` and `students` table via `req.user.userId`. Aggregates pending assignments, calculates student workload score against a 20-point gauge:
+  ```sql
+  SELECT s.course_id, s.semester, s.section, s.cgpa, c.name AS course_name, d.name AS department_name
+  FROM students s
+  JOIN courses c ON s.course_id = c.id
+  JOIN departments d ON c.department_id = d.id
+  WHERE s.user_id = $1
+  ```
+- **Success Response (HTTP 200 OK):**
   ```json
   {
-      "success": true,
-      "tasks": [...],
-      "summary": { "totalTasks": 4, "activeCount": 2, "completedCount": 2, "currentWorkload": 9, "threshold": 15 }
+    "success": true,
+    "student": { "name": "Ada Lovelace", "course": "B.Tech CSE", "semester": 5 },
+    "summary": { "pendingAssignments": 1, "submittedAssignments": 0 },
+    "workload": { "score": 8, "gaugeMax": 20, "status": "Moderate Load" }
   }
   ```
 
-### 3.2 `PATCH /api/faculty/tasks/:id/status`
-- **Purpose:** Updates task status (`pending`, `in_progress`, `completed`).
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `facultyController.js` $\rightarrow$ `updateTaskStatus`.
-- **Request Body:** `{ "status": "completed" }`
-- **Response `200 OK`:** `{ "success": true, "task": { ... } }`
-
-### 3.3 `POST /api/faculty/tasks/:id/deliverable`
-- **Purpose:** Submits faculty completion remarks and base64 file upload.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `facultyController.js` $\rightarrow$ `submitTaskDeliverable`.
-- **Caller:** `UI/faculty/js/faculty.js` $\rightarrow$ `#deliverableForm` submit.
+#### `PATCH /api/student/assignments/:id/submit`
+- **Controller:** `backend/src/controllers/studentController.js:195` (`submitAssignment`)
+- **Route:** `backend/src/routes/studentRoutes.js:14`
+- **Middleware:** `authenticateToken`
 - **Request Body:**
   ```json
   {
-      "status": "completed",
-      "faculty_remark": "Question paper verified and rubrics mapped.",
-      "filename": "OS_Midterm_Paper.pdf",
-      "file_data": "data:application/pdf;base64,JVBERi0xLjQK..."
+    "submission_text": "GitHub Repo: https://github.com/student/os-scheduling",
+    "submission_file": "report.pdf"
   }
   ```
-- **Response `200 OK`:**
-  ```json
-  {
-      "success": true,
-      "message": "Task deliverable and remark submitted successfully!",
-      "task": {
-          "id": 1,
-          "faculty_remark": "Question paper verified and rubrics mapped.",
-          "attachment_filename": "OS_Midterm_Paper.pdf",
-          "attachment_url": "http://localhost:5000/uploads/1725150000000_OS_Midterm_Paper.pdf",
-          "completed_at": "2026-10-22T18:30:00.000Z"
-      }
-  }
+- **Database Operation:**
+  ```sql
+  UPDATE student_assignment_submissions
+  SET status = 'submitted', submission_text = $1, submission_file = $2, submitted_at = NOW()
+  WHERE assignment_id = $3 AND student_id = $4
+  RETURNING *
   ```
-
-### 3.4 `GET /api/faculty/subjects`
-- **Purpose:** Retrieves subjects mapped to logged-in faculty via `subject_faculty`.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `facultyController.js` $\rightarrow$ `getMySubjects`.
-- **Caller:** `UI/faculty/js/faculty.js` $\rightarrow$ `fetchFacultySubjects()`.
-- **Response `200 OK`:**
+- **Success Response (HTTP 200 OK):**
   ```json
   {
-      "success": true,
-      "subjects": [
-          { "id": 2, "name": "Operating Systems", "code": "CS301", "semester": 5, "course_name": "B.Tech Computer Science and Engineering" }
-      ]
-  }
-  ```
-
-### 3.5 `POST /api/faculty/student-assignments/check`
-- **Purpose:** Pre-validates student class workload against daily (10 pts) and weekly (18 pts) limits.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `facultyController.js` $\rightarrow$ `checkStudentWorkload`.
-- **Caller:** `UI/faculty/js/faculty.js` on assignment creation submit.
-- **Request Body:**
-  ```json
-  {
-      "subject_id": 2,
-      "difficulty": 8,
-      "due_date": "2026-09-08"
-  }
-  ```
-- **Response `200 OK` (Collision Detected):**
-  ```json
-  {
-      "success": true,
-      "can_assign": false,
-      "is_overloaded": true,
-      "reason": "Daily workload threshold exceeded",
-      "workload": {
-          "date": "2026-09-08",
-          "current_daily_workload": 6,
-          "task_difficulty": 8,
-          "resulting_daily_workload": 14,
-          "daily_threshold": 10
-      },
-      "alternative_dates": [
-          { "date": "2026-09-10", "formatted_date": "Thu, Sep 10, 2026", "current_workload": 0, "resulting_workload": 8, "threshold": 10 }
-      ]
-  }
-  ```
-
-### 3.6 `POST /api/faculty/student-assignments`
-- **Purpose:** Atomically inserts assignment and generates pending submission rows for all enrolled class students.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `facultyController.js` $\rightarrow$ `assignWorkToStudents`.
-- **Request Body:**
-  ```json
-  {
-      "subject_id": 2,
-      "title": "OS Lab Assignment 1",
-      "description": "Implement CPU scheduling algorithms in C.",
-      "difficulty": 4,
-      "due_date": "2026-09-10",
-      "max_marks": 100
-  }
-  ```
-- **Response `201 Created`:**
-  ```json
-  {
-      "success": true,
-      "message": "Assignment successfully published to 60 students in B.Tech Computer Science (Semester 5).",
-      "assignment": { "id": 5, "title": "OS Lab Assignment 1" },
-      "students_notified": 60
-  }
-  ```
-
-### 3.7 `GET /api/faculty/student-assignments`
-- **Purpose:** Fetches all student assignments assigned by logged-in faculty with turn-in metrics.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `facultyController.js` $\rightarrow$ `getMyAssignedStudentWorks`.
-- **Caller:** `UI/faculty/js/faculty.js` $\rightarrow$ `fetchAssignedStudentWorks()`.
-- **Response `200 OK`:**
-  ```json
-  {
-      "success": true,
-      "assigned_works": [
-          {
-              "id": 5,
-              "title": "OS Lab Assignment 1",
-              "difficulty": 4,
-              "due_date": "2026-09-10",
-              "total_students": 60,
-              "submitted_count": 48
-          }
-      ]
+    "success": true,
+    "message": "Assignment submitted successfully!",
+    "submission": { "id": 1, "status": "submitted" }
   }
   ```
 
 ---
 
-## 4. Student Module Endpoints (`/api/student/*`)
+## 3. Unregistered Routes Claimed in Earlier Documentation
 
-### 4.1 `GET /api/student/dashboard`
-- **Purpose:** Returns student profile, active course count, pending vs completed assignments, and dynamic workload percentage.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `studentController.js` $\rightarrow$ `getStudentDashboard`.
-- **Caller:** `UI/student/js/student.js` $\rightarrow$ `fetchStudentDashboard()`.
-- **Response `200 OK`:**
-  ```json
-  {
-      "success": true,
-      "profile": {
-          "id": 4,
-          "customId": "STU001",
-          "name": "Ada Lovelace",
-          "email": "student@uniflow.edu",
-          "courseName": "B.Tech Computer Science and Engineering",
-          "semester": 5,
-          "cgpa": 8.40
-      },
-      "stats": {
-          "activeCourses": 5,
-          "pendingAssignments": 2,
-          "completedAssignments": 4,
-          "workloadPoints": 8,
-          "workloadPercentage": 40
-      }
-  }
-  ```
+The following endpoints were claimed to exist in earlier unverified documentation handoffs (`00`–`08`) but are **NOT REGISTERED** in any Express router and have no implementation in the codebase:
 
-### 4.2 `GET /api/student/assignments`
-- **Purpose:** Retrieves all assignments for student's course and semester with personal submission status.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `studentController.js` $\rightarrow$ `getStudentAssignments`.
-- **Caller:** `UI/student/js/student.js` $\rightarrow$ `fetchStudentAssignments()`.
-- **Response `200 OK`:**
-  ```json
-  {
-      "success": true,
-      "assignments": [
-          {
-              "id": 5,
-              "title": "OS Lab Assignment 1",
-              "difficulty": 4,
-              "due_date": "2026-09-10",
-              "subject_name": "Operating Systems",
-              "faculty_name": "Grace Hopper",
-              "submission_status": "pending",
-              "marks_obtained": null
-          }
-      ]
-  }
-  ```
-
-### 4.3 `GET /api/student/courses`
-- **Purpose:** Returns enrolled curriculum subjects and assigned faculty names.
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `studentController.js` $\rightarrow$ `getStudentCourses`.
-- **Caller:** `UI/student/js/student.js` $\rightarrow$ `fetchStudentCourses()`.
-- **Response `200 OK`:**
-  ```json
-  {
-      "success": true,
-      "courses": [
-          { "id": 2, "code": "CS301", "name": "Operating Systems", "credits": 4, "faculty_names": "Grace Hopper" }
-      ]
-  }
-  ```
-
-### 4.4 `PATCH /api/student/assignments/:id/submit`
-- **Purpose:** Online assignment turn-in by student (submitting notes or repository links).
-- **Access Level:** Protected (`authenticateToken`).
-- **Controller:** `studentController.js` $\rightarrow$ `submitAssignment`.
-- **Caller:** `UI/student/js/student.js` $\rightarrow$ `window.submitStudentWork()`.
-- **Request Body:** `{ "submission_text": "GitHub repo: github.com/ada/os-scheduler" }`
-- **Business Logic:**
-  - Updates `student_assignment_submissions` status to `'submitted'`, writes `submitted_at = NOW()`.
-  - Automatically reduces the student's active pending workload on next dashboard query.
-- **Response `200 OK`:**
-  ```json
-  {
-      "success": true,
-      "message": "Assignment submitted successfully!",
-      "submission": { "id": 12, "status": "submitted", "submitted_at": "2026-10-22T18:40:00.000Z" }
-  }
-  ```
+| Claimed Endpoint | Method | Claimed Purpose | Reality in Source Code |
+| :--- | :---: | :--- | :--- |
+| `/api/faculty/tasks/:id/deliverable` | `POST` | Base64 deliverable file upload & remark | **NOT REGISTERED.** No upload route exists in `facultyRoutes.js`. |
+| `/api/faculty/tasks/file/:filename` | `GET` | Attachment file download handler | **NOT REGISTERED.** No file download handler exists in backend. |
+| `/api/admin/users` | `POST` | Admin user enrollment & password setup | **NOT REGISTERED.** Admin features operate entirely in `localStorage`. |
+| `/api/admin/departments` | `POST` | Admin department creation | **NOT REGISTERED.** Admin operates in `localStorage`. |
+| `/api/admin/courses` | `POST` | Admin course creation | **NOT REGISTERED.** Admin operates in `localStorage`. |
+| `/api/admin/hod/assign` | `POST` | Admin HOD credential assignment | **NOT REGISTERED.** Handled via client-side `localStorage`. |
+| `/api/grievances` | `GET/POST` | Grievance lodging & tracking | **NOT REGISTERED.** Handled via mock array in `hod.js` / `faculty.js`. |
+| `/api/grievances/:id` | `PATCH` | HOD sends resolution remarks | **NOT REGISTERED.** Mutates client-side object in `hod.js:1263`. |
+| `/api/timetable` | `GET/POST` | Timetable grid load and updates | **NOT REGISTERED.** Stored in browser `localStorage`. |
+| `/api/chat/threads` | `GET/POST` | Department messaging threads | **NOT REGISTERED.** Uses hardcoded static messages in `hod.js`. |
+| `/api/student/performance` | `GET` | Marks & GPA trend data | **NOT REGISTERED.** Hardcoded sample stats in `student.js`. |
+| `/api/student/attendance` | `GET` | Subject-wise attendance percentages | **NOT REGISTERED.** Hardcoded in `student.js:loadCourses`. |

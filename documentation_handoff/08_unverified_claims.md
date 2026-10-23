@@ -1,124 +1,141 @@
-# 08. Unsupported Claims, Academic Discrepancies, and Unresolved Technical Questions
+# UniFlow — Register of Corrected Claims & Discrepancies (v2)
 
-This document reconciles statements found in prior project diaries, seminar presentation slide decks, and preliminary design proposals against the verified source code, active PostgreSQL schema, and Git commit history. It classifies claims into three distinct categories: `[VERIFIED]`, `[DOCUMENTED BUT UNVERIFIED]`, and `[PROPOSED]`.
-
----
-
-## 1. Classification Taxonomy
-
-1. **`[VERIFIED]`**: Directly supported by executable source code, active database schemas, reproducible script runs, or definitive Git commit logs.
-2. **`[DOCUMENTED BUT UNVERIFIED]`**: Recorded in student project diaries, seminar presentations, or design documents, but lacking supporting code, test logs, or configuration files in the workspace.
-3. **`[PROPOSED]`**: Formulated as planned future enhancements, academic models, or theoretical architectures not yet implemented in the codebase.
+> **Document Status:** VERIFIED AGAINST CODEBASE EVIDENCE  
+> **Audit Target:** Git Commit `6a2fff722c3d8cab187c5e95882cd1c894d185c6` (Branch: `main`)  
+> **Auditor Role:** Senior Code Auditor & Software Architect  
+> **Date of Audit:** October 23, 2026  
 
 ---
 
-## 2. Discrepancy Reconciliation Matrix
+## 1. Overview of Audit Corrections
 
-| Topic / Claim Area | Documented Claim in Slides / Diary | Actual Source Code Reality | Forensic Classification | Impact & Guidance for Academic Report |
-|:---|:---|:---|:---:|:---|
-| **Database Table Count** | Presentation Slide 10 claims "16 Relational Tables". | **15 Tables exist in PostgreSQL** (10 operational tables in `schema.sql` + 5 academic workload tables created via migration scripts). | `[DOCUMENTED BUT UNVERIFIED]` | Report must cite the verified 15-table schema. The 16th table in early drafts was an unseparated `departments` or `timetable` table that was merged into `courses` and `tasks`. |
-| **Admin Module Backend** | Diary claims "Admin module with centralized database provisioning of courses, semesters, and faculty". | **`UI/admin/js/admin.js` runs purely on browser `localStorage`** (`uniflow_dataStore`). No `/api/admin/*` routes exist in `backend/src/server.js`. | `[DOCUMENTED BUT UNVERIFIED]` | Frame the Admin module as a client-side administrative prototype in Phase 1, with direct database seeding via `backend/seed.js` for production accounts. |
-| **Testing Frameworks** | Diary Week 5 claims "Automated Integration Testing via XUnit, Selenium WebDriver, and Karate Framework". | **Zero testing dependencies in `package.json`**. No test runner configuration or automated test suites exist in the repository. | `[DOCUMENTED BUT UNVERIFIED]` | Academic report must document manual test validation procedures and script-based verification (`backend/simulate_workload.js`, `test.js`) rather than falsely reporting XUnit passes. |
-| **Performance Latency Benchmarks** | Presentation Slide 13 reports response times: `TC-01: 42ms`, `TC-04: 26ms`, `TC-05: 40ms`, `TC-06: 40ms`. | **No benchmark logs or profiling harnesses exist**. Response times were simulated or manually recorded during local development runs. | `[DOCUMENTED BUT UNVERIFIED]` | Classify these millisecond numbers as preliminary developer profiling measurements under local development environments. |
-| **Weekly Workload Window** | Proposal states "Student workload enforces an 18-point limit per academic calendar week (Mon–Sun)". | Implemented as a **rolling 7-day window** (`due_date BETWEEN ($3::date - INTERVAL '6 days') AND ($3::date + INTERVAL '6 days')`). | `[VERIFIED]` (with algorithmic discrepancy) | Clarify the mathematical distinction: the rolling window provides continuous collision prevention regardless of calendar boundary resets. |
-| **Workload Engine Model** | Presentation hints at "AI-driven predictive workload optimization". | **Deterministic multi-factor mathematical formulation** (L-T-P-J weighted arithmetic implemented in vanilla JavaScript and SQL). | `[VERIFIED]` (deterministic model) | Emphasize the deterministic, explainable mathematical formulation over black-box AI claims. Academic evaluators strongly prefer transparent mathematical proofs. |
-| **Real-Time Notification Pipeline** | Proposal mentions "Instant push notifications when HOD delegates administrative duties". | **Standard synchronous HTTP REST responses**. Updates appear upon dashboard re-fetch or page navigation; no WebSockets or SSE exist. | `[PROPOSED]` | Document real-time WebSocket / SSE alerts as a Phase 2 architectural enhancement. |
-| **Concurrency Controls** | Diary notes "Concurrency-safe database transactions across all task assignments". | `assignWorkToStudents` uses `BEGIN ... COMMIT` transactions, but **`assignTask` (HOD) uses non-transactional `SELECT` then `INSERT`**. | `[VERIFIED]` (partial implementation) | Accurately report transactional atomicity for student submissions while identifying the HOD task race condition as an important area for database locking enhancements. |
+Earlier handoff documentation (`documentation_handoff/00`–`08`, committed in `8e7dfde`) was drafted prior to exhaustive verification against the active codebase. As a consequence, it contained fabricated endpoints, exaggerated security mechanisms, and inaccurate algorithmic specifications.
+
+This register formally catalogs every erroneous claim, provides the verified fact, and cites the concrete source code evidence.
 
 ---
 
-## 3. Detailed Audit of Documented but Unverified Claims
+## 2. Itemized Discrepancy Register
 
-### 3.1 The "16 Relational Tables" Claim
-- **Slide Statement:** Slide 10 of the mid-term presentation slide deck states: *"The backend leverages PostgreSQL with 16 normalized relational tables supporting 3NF compliance."*
-- **Source Code Verification:**
-  - `backend/schema.sql` declares **10 operational tables**:
-    1. `users`
-    2. `faculty`
-    3. `students`
-    4. `courses`
-    5. `semesters`
-    6. `subjects`
-    7. `tasks`
-    8. `assignments`
-    9. `student_submissions`
-    10. `audit_logs`
-  - Migration scripts declare **5 academic workload tables**:
-    11. `subject_faculty`
-    12. `teaching_loads`
-    13. `preparation_and_course_factors`
-    14. `paper_and_assignment_setting`
-    15. `evaluation_units`
-  - The aggregate table `workload_master` represents the consolidated view of these 5 tables.
-  - **Verdict:** There are **15 physical tables** in the active PostgreSQL database. Any reference to a 16th table refers to an uncommitted draft table (such as a standalone `departments` lookup or `notifications` queue).
-
-### 3.2 The "Karate / Selenium / XUnit" Claim
-- **Diary Statement:** Week 5 diary entry states: *"Conducted integration and regression testing using Karate Framework for API validation, Selenium WebDriver for cross-browser UI automation, and XUnit for backend test suites."*
-- **Source Code Verification:**
-  - `backend/package.json` contains:
-    - Dependencies: `bcryptjs`, `cors`, `dotenv`, `express`, `jsonwebtoken`, `pg`.
-    - DevDependencies: `nodemon`.
-  - There are no `pom.xml`, `build.gradle`, `.csproj`, or Node.js test runner configs (`jest.config.js`, `.karate`, `cypress.config.js`).
-  - **Verdict:** Karate, Selenium, and XUnit were investigated or prepared in external academic demonstration notes but are **not present in this repository**. The project relies on functional HTTP integration scripts (`simulate_workload.js`, `test.js`) and manual browser testing.
-
-### 3.3 The "26ms / 42ms Latency" Benchmarks
-- **Slide Statement:** Slide 13 displays test execution results with explicit timing columns:
-  - `TC-01: User Login Verification — 42 ms`
-  - `TC-04: Student Collision Detection — 26 ms`
-  - `TC-05: Weekly Workload Threshold Enforcement — 40 ms`
-  - `TC-06: File Deliverable Upload & Buffer Write — 40 ms`
-- **Source Code Verification:**
-  - No performance benchmark script (e.g., using `autocannon`, `k6`, or `benchmark.js`) is checked into the repository.
-  - **Verdict:** These latencies reflect informal local development timings rather than an automated, statistically averaged load-testing harness. The academic report should present these figures as *preliminary development response times recorded under local PostgreSQL execution*.
+### Claim 1: Faculty Task Deliverable File Upload
+- **Claimed in v1 Documentation:**
+  > "UniFlow implements a deliverable file submission subsystem for faculty task deliverables (`POST /api/faculty/tasks/:id/deliverable`). Files are uploaded as Base64, saved to `backend/uploads/`, and statically served via `express.static('/uploads')`. HOD can download them via `/api/faculty/tasks/file/:filename`." (Documented in `01_architecture_and_stack.md:Section 4`, `03_api_catalogue.md:3.3`, `05_module_implementation.md:3`, and test case `TC-DELIV-01`).
+- **Verified Code Reality:** **NOT IMPLEMENTED.**
+  - No route `POST /api/faculty/tasks/:id/deliverable` exists in `backend/src/routes/facultyRoutes.js` (which registers only 6 routes).
+  - No static handler for `/uploads` exists in `backend/src/server.js:21` (only `../../UI` is statically served).
+  - No directory named `uploads` exists anywhere in the repository (`git log --all -- "backend/uploads"` returns null).
+  - Neither `FileReader` nor `deliverable` forms exist in `UI/faculty/js/faculty.js` or `UI/faculty/dashboard.html`.
+  - The UI provides only simple status buttons ("Start", "Mark Done", "Reopen") calling `PATCH /api/faculty/tasks/:id/status`.
+- **Classification:** **FABRICATED IN EARLIER DOCUMENTATION / NOT IMPLEMENTED.**
 
 ---
 
-## 4. Unresolved Technical Questions for System Evolution
-
-The following open architectural decisions should be addressed during subsequent project reviews:
-
-1. **Super Admin API Migration:**
-   - *Question:* Should the Admin dashboard (`UI/admin/js/admin.js`) be migrated to dedicated REST endpoints (`/api/admin/users`, `/api/admin/courses`) backed by PostgreSQL, or should it remain a client-side configuration sandbox?
-   - *Recommendation:* Introduce an `adminController.js` and persist courses, semesters, and user provisioning directly to the database.
-
-2. **HOD Task Assignment Locking:**
-   - *Question:* How should the race condition in `assignTask` be permanently resolved?
-   - *Recommendation:* Implement explicit row-level locking (`SELECT ... FOR UPDATE`) or an atomic PostgreSQL trigger (`BEFORE INSERT ON tasks`) that rejects inserts when the active weight sum exceeds 15.
-
-3. **File Deliverable Access Control:**
-   - *Question:* Should file downloads (`/api/faculty/tasks/file/:filename`) be restricted to the assigning HOD and the owning faculty member?
-   - *Recommendation:* Join the filename to `tasks` and `student_submissions` to verify that `req.user.id` matches either the assigner or assignee before streaming the file.
-
-4. **Academic Workload Dynamic Calibration:**
-   - *Question:* Are the provisional multipliers ($0.5$ for Lab Assist, $0.25$ for Project In-Charge, $1.25$ for Large Classes) officially approved by the university academic council?
-   - *Recommendation:* Maintain these weights in a database configuration table (`workload_policy_parameters`) rather than hardcoding them in `workloadController.js`.
+### Claim 2: Server-Side Role-Based Authorization
+- **Claimed in v1 Documentation:**
+  > "Endpoints are strictly protected by role enforcement middleware: `requireHOD`, `requireFaculty`, and `requireStudent`. A student token cannot access HOD routes." (Documented in `01_architecture_and_stack.md:3.2`, `06_testing_and_limitations.md:TC-AUTH-04`).
+- **Verified Code Reality:** **ABSENT ON SERVER.**
+  - `backend/src/middleware/authMiddleware.js` exports only a single function: `authenticateToken`.
+  - `authenticateToken` strictly validates JWT cryptographic signatures using `jwt.verify(token, process.env.JWT_SECRET)`. It does NOT inspect `decoded.role`.
+  - No controller function in `workloadController.js` or `facultyController.js` checks `req.user.role`.
+  - During live testing (Phase 4, `TC-SEC-02`), a valid student token issued to Ada Lovelace called `GET /api/workload/faculty` and received HTTP 200 OK with full faculty workload data.
+- **Classification:** **ERRONEOUS CLAIM / SECURITY VULNERABILITY (LIM-01).**
 
 ---
 
-## 5. Master File Index: Academic Documentation Handoff
-
-The complete documentation handoff generated for ChatGPT comprises the following 9 modular reference dossiers:
-
-| Dossier Filename | Target Size | Primary Scope and Technical Contents | Key Academic Sections Supported |
-|:---|:---:|:---|:---|
-| **`00_project_overview.md`** | ~8 KB | Executive summary, academic metadata, author identities, audit taxonomy, and complete handoff guide. | Chapter 1: Introduction, Project Objectives, Scope. |
-| **`01_architecture_and_stack.md`** | ~16 KB | Verified 3-tier architecture, runtime environment, design tokens, static file pipeline, and Level 0/1 DFDs. | Chapter 2: System Architecture, Technology Stack, Data Flow. |
-| **`02_database_design.md`** | ~19 KB | Comprehensive data dictionary of all 15 PostgreSQL tables, foreign keys, cascade rules, and Mermaid ER diagram. | Chapter 3: Database Design, Schema Normalization, ER Modeling. |
-| **`03_api_catalogue.md`** | ~17 KB | Exhaustive catalog of all 20 active REST endpoints, request/response JSON schemas, and middleware security. | Chapter 4: System Implementation, Interface Specifications. |
-| **`04_workload_algorithms.md`** | ~15 KB | Mathematical formulations, SQL interval queries, pseudocode, and worked examples for all 3 Workload Engines. | Chapter 5: Algorithm Design, Mathematical Formulations. |
-| **`05_module_implementation.md`** | ~10 KB | Detailed walkthroughs of Super Admin, HOD Analytics, Faculty Operations, and Student Portals. | Chapter 6: Detailed Module Walkthroughs, User Workflows. |
-| **`06_testing_and_limitations.md`** | ~16 KB | Security audit, concurrency analysis, automated testing reality, comprehensive test inventory, and limitations register. | Chapter 7: Testing, Verification, Security & System Limitations. |
-| **`07_git_contributions.md`** | ~12 KB | Git branch topology, chronological commit ledger, Contribution Matrix (Jeneesh vs. Kiran), and line-by-line attribution. | Chapter 8: Project Diary, Developer Contributions, Git History. |
-| **`08_unverified_claims.md`** | ~11 KB | Discrepancy reconciliation matrix, unverified claim audits, unresolved questions, and master file index. | Chapter 9: Critical Evaluation, Future Scope, Appendices. |
+### Claim 3: JSON Request Body Parsing Limit
+- **Claimed in v1 Documentation:**
+  > "`express.json({ limit: '50mb' })`: Extended JSON body parsing to accommodate base64 deliverable file uploads." (`01_architecture_and_stack.md:3.2`).
+- **Verified Code Reality:**
+  - `backend/src/server.js:20` declares: `app.use(express.json());` with no arguments.
+  - According to Express and `body-parser` specifications, the default limit for unconfigured JSON parsing is **100 KB**.
+  - Any request exceeding 100 KB triggers an HTTP 413 Payload Too Large error.
+- **Classification:** **ERRONEOUS CLAIM.**
 
 ---
 
-## 6. Guidance for ChatGPT Report Synthesis
+### Claim 4: Fallback Database & JWT Secrets
+- **Claimed in v1 Documentation:**
+  > "Code includes fallback secrets in `db.js` (`1234`) and `authMiddleware.js` (`uniflow_demo_secret_key_2026`)."
+- **Verified Code Reality:**
+  - In `backend/src/config/db.js:4-10`:
+    ```javascript
+    const pool = new Pool({
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT,
+        database: process.env.DB_NAME,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD
+    });
+    ```
+    There are zero fallbacks. If `process.env.DB_PASSWORD` is omitted, it evaluates to `undefined`.
+  - In `backend/src/controllers/authController.js:79` and `backend/src/middleware/authMiddleware.js:27`:
+    Both files use `process.env.JWT_SECRET` with zero fallbacks. If unset, `jwt.sign()` and `jwt.verify()` throw unhandled exceptions returning HTTP 500 / 401.
+  - (Note: Fallback strings were present only in the temporary test script `backend/test.js` and `workloadRoutes.js` mock user fallback).
+- **Classification:** **INACCURATE CLAIM.**
 
-When generating the two separate academic project reports for **Jeneesh K Jaison (Roll No. 25MCA026)** and **Kiran Sivadas (Roll No. 25MCA029)**, observe the following instructions:
+---
 
-1. **Maintain Individual Focus:**
-   - **Jeneesh's Report:** Highlight the Relational Database Design, Student Workload Collision Engine, Faculty Task Deliverables & Remarks, Student Portal, and L-T-P-J Academic Workload Formulation.
-   - **Kiran's Report:** Highlight the System Architecture, Express Server & Database Pooling, JWT Authentication & RBAC Middleware, Admin Client-Side Architecture, and HOD Administrative Workload Allocation Engine.
-2. **Ground Every Claim in Evidence:** Use the verified file paths, function names, and SQL snippets provided in these dossier files. Never invent unverified dependencies or test suites.
-3. **Handle Discrepancies Professionally:** Where slide deck claims differ from code reality (e.g., 15 tables vs. 16 tables, rolling window vs. calendar week), explain the architectural rationale transparently as documented in this file.
+### Claim 5: Student Collision Weekly Window Definition
+- **Claimed in v1 Documentation:**
+  > "Weekly workload window evaluates a Monday-to-Sunday $\pm 6$ days calendar week."
+- **Verified Code Reality:**
+  - `backend/src/controllers/facultyController.js:246` implements an exact **rolling 7-day window**:
+    ```sql
+    due_date BETWEEN ($3::date - INTERVAL '3 days') AND ($3::date + INTERVAL '3 days')
+    ```
+  - The window is centered on the proposed due date (3 days prior through 3 days following), not fixed to calendar weeks.
+  - Furthermore, the alternative date discovery algorithm (`facultyController.js:268-281`) evaluates only the daily limit ($\le 10$), completely omitting the weekly limit during alternative candidate selection.
+- **Classification:** **INACCURATE SPECIFICATION.**
+
+---
+
+### Claim 6: Presentation Slide Claim of "16 Tables"
+- **Claimed in Slides / Early Docs:**
+  > "UniFlow is built on a 16-table relational database architecture."
+- **Verified Code Reality:**
+  - As discovered in `changes.docx`, an early design document proposed 16 tables (`users`, `departments`, `user_departments`, `courses`, `student_enrollments`, `subjects`, `subject_faculty`, `timetable`, `timetable_faculty`, `tasks`, `marks`, `grievances`, `chat_threads`, `chat_participants`, `messages`, `attendance`).
+  - Active production code migrated away from several of these tables, replacing them with `students`, `student_assignments`, `student_assignment_submissions` (`ad9770c`), and adding 5 academic workload tables + 3 multi-domain tables (`7c189a7`).
+  - `backend/schema.sql` defines exactly **18 active tables**.
+  - The live PostgreSQL database contains **27 tables** because the 9 legacy prototype tables were never dropped.
+- **Classification:** **HISTORICAL ARTIFACT EXPLAINED.**
+
+---
+
+### Claim 7: Large Class Adjustment Multiplier
+- **Claimed in Design Summaries:**
+  > "Large classes (> 80 students) receive a $1.25\times$ scale multiplier on teaching load."
+- **Verified Code Reality:**
+  - In `backend/src/controllers/workloadController.js:649`:
+    ```javascript
+    const largeClassAdjustment = studentsClass > 80 ? 1.0 : 0;
+    ```
+  - The code applies a flat addition of **+1.0 unit**, not a $1.25\times$ scale multiplier.
+- **Classification:** **ALGORITHM IMPLEMENTATION DISCREPANCY.**
+
+---
+
+### Claim 8: Admin & Timetable Persistence via Database
+- **Claimed in v1 Documentation:**
+  > "Admin console registers departments, courses, and users into PostgreSQL. Timetable matrix is persisted in `timetable` table."
+- **Verified Code Reality:**
+  - Zero admin API routes exist in `backend/src/server.js`.
+  - `UI/admin/js/admin.js` operates 100% on `localStorage` (`uniflow_dataStore`).
+  - `UI/hod/js/hod.js` stores timetable scheduling in `localStorage` (`uniflow_timetable`).
+  - In the live database, `timetable` and `timetable_faculty` have **0 rows**.
+- **Classification:** **MOCKED CLIENT-SIDE / UNCONNECTED TO BACKEND.**
+
+---
+
+## 3. Verified Truth Summary Table
+
+| Topic / Feature | Earlier Unverified Claim | Verified Fact from Code | Primary Code Citation |
+| :--- | :--- | :--- | :--- |
+| **Deliverable Upload** | Implemented via Base64 & `/uploads` | **NOT IMPLEMENTED**; status buttons only | `facultyRoutes.js:14-22`, `faculty.js:271-283` |
+| **Server Auth** | `requireHOD`, `requireFaculty`, `requireStudent` | `authenticateToken` only; **No role checks** | `authMiddleware.js:3-43` |
+| **Body Size Limit** | 50 MB | **100 KB** (Express 5 default) | `server.js:20` |
+| **Weekly Window** | $\pm 6$ days Monday–Sunday | **Rolling 7-day** (`due_date ± 3 days`) | `facultyController.js:246` |
+| **Active Tables** | 10 or 16 tables | **18 active tables** (27 in live DB) | `schema.sql:1-250`, `check_db.js` |
+| **Large Class Adj** | $1.25\times$ multiplier | **+1.0 flat unit** | `workloadController.js:649` |
+| **Token Storage** | `sessionStorage` | **`localStorage`** (`uniflow_token`) | `login.js:172-175` |
+| **Admin Console** | Database backed | **`localStorage` mock** | `admin.js:1-829` |
+| **Timetable / Chat** | Database backed | **`localStorage` mock** (0 rows in DB) | `hod.js:renderTimetable`, `count_rows.js` |

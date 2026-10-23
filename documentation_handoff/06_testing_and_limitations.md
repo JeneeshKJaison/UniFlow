@@ -1,314 +1,369 @@
-# 06. Testing Inventory, Security Audit, and System Limitations
+# UniFlow — Verified Test Evidence & Known Limitations (v2)
 
-This document presents an exhaustive, evidence-based audit of UniFlow's security architecture, concurrency safety, reliability mechanisms, automated testing status, and comprehensive test suite inventory. It distinguishes empirically executed tests from manual procedures and unexecuted test specifications.
-
----
-
-## 1. Security Architecture and Vulnerability Audit
-
-### 1.1 Authentication and Token Management
-- **Password Storage (`[VERIFIED]`):** Handled via `bcryptjs` with salt rounds set to `10` (`bcrypt.genSalt(10)`). Passwords are never stored in plaintext in PostgreSQL (`users.password_hash`).
-- **Token Format (`[VERIFIED]`):** JSON Web Tokens (JWT) signed with HMAC-SHA256 via `jsonwebtoken.sign()`.
-  - **Payload:** `{ id, custom_id, name, email, role, is_hod }`.
-  - **Expiration:** 24 hours (`expiresIn: '24h'`).
-  - **Storage:** Frontend stores token in `sessionStorage.getItem('token')` or `localStorage.getItem('token')`.
-- **Secret Hygiene (`[VERIFIED]` / `[CRITICAL FINDING]`):**
-  - In `authController.js` and `authMiddleware.js`, JWT secret is read from `process.env.JWT_SECRET || 'uniflow_super_secret_jwt_key_2024'`.
-  - In `db.js`, database connection falls back to default credentials (`postgres:1234@localhost:5432/uniflow_db`).
-  - *Risk:* Hardcoded fallback secrets in source code present severe credential leakage risk if committed to public repositories or deployed without setting strict environment variables.
-
-### 1.2 Authorization and Access Control (RBAC)
-- **Middleware Verification (`[VERIFIED]`):**
-  - `authenticateToken`: Validates Bearer token format and signature. Attaches decoded token payload to `req.user`.
-  - `requireHOD`: Verifies `req.user.role === 'hod' || req.user.is_hod === true`. Returns `403 Forbidden` otherwise.
-  - `requireFaculty`: Verifies `req.user.role === 'faculty'`. Returns `403 Forbidden` otherwise.
-  - `requireStudent`: Verifies `req.user.role === 'student'`. Returns `403 Forbidden` otherwise.
-- **Route Authorization Gaps (`[VERIFIED]`):**
-  - The Admin module frontend (`UI/admin/js/admin.js`) operates purely client-side using browser `localStorage` (`uniflow_dataStore`). No backend `/api/admin/*` routes exist; thus, there is no server-side Super Admin role enforcement or centralized database persistence for Admin actions.
-  - File download endpoint `GET /api/faculty/tasks/file/:filename` is protected by `authenticateToken`, allowing any authenticated user (regardless of role or task ownership) to download any file stored in `backend/uploads/` if the filename is known.
-
-### 1.3 SQL Injection Resistance and Query Parameterization
-- **Parameterization (`[VERIFIED]`):**
-  - 100% of SQL queries executed through the `pg` client (`pool.query(...)` and `client.query(...)`) utilize parameterized placeholders (`$1, $2, $3, ...`).
-  - No raw string interpolation or query concatenation (`'SELECT * FROM users WHERE email = ' + email`) exists in any controller.
-  - *Result:* High resistance to classical SQL injection attacks.
-
-### 1.4 Input Validation and Payload Size Vulnerability
-- **Body Parser Limits (`[VERIFIED]` / `[SECURITY FINDING]`):**
-  - `src/server.js` configures:
-    ```javascript
-    app.use(express.json({ limit: '50mb' }));
-    app.use(express.urlencoded({ limit: '50mb', extended: true }));
-    ```
-  - *Vulnerability:* Permitting 50MB JSON payloads without rate limiting creates an open Denial-of-Service (DoS) vector. A malicious or automated client could overwhelm server memory (V8 heap allocation) by streaming repeated 50MB payloads.
-- **Input Sanitization:**
-  - Controllers validate the presence of required fields (e.g., `if (!email || !password) return res.status(400)...`).
-  - Strong schema validation libraries (e.g., Joi, Zod, or express-validator) are **not implemented**. Missing or malformed data types rely on PostgreSQL runtime type coercion and error catching.
-
-### 1.5 File Upload Handling and Static Storage
-- **Upload Mechanism (`[VERIFIED]`):**
-  - Files are transmitted within the JSON request body as base64-encoded strings (`{ fileData: "data:...base64,...", fileName: "document.pdf" }`).
-  - File saving logic in `facultyController.js` and `studentController.js`:
-    ```javascript
-    const base64Content = file.data.includes('base64,') ? file.data.split('base64,')[1] : file.data;
-    const buffer = Buffer.from(base64Content, 'base64');
-    const safeName = Date.now() + '-' + file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filePath = path.join(uploadDir, safeName);
-    fs.writeFileSync(filePath, buffer);
-    ```
-- **Security Assessment:**
-  - *Path Traversal:* Regex sanitization `[^a-zA-Z0-9.-]` strips path separators (`/`, `\`, `..`), preventing directory traversal outside `backend/uploads/`.
-  - *MIME & Magic Bytes:* No MIME-type or binary magic-byte inspection is performed. A client can upload arbitrary executables (`.exe`, `.sh`, `.bat`) or HTML/SVG files with embedded scripts.
-  - *Execution Risk:* Since static files in `backend/uploads/` are served with generic headers via `express.static`, serving active HTML/SVG could lead to Stored Cross-Site Scripting (XSS).
-
-### 1.6 Network and HTTP Security Headers
-- **CORS (`[VERIFIED]`):** Handled via `cors()` with default settings, permitting wildcard origin (`Access-Control-Allow-Origin: *`).
-- **Security Headers (`[VERIFIED]`):** `helmet` middleware is not installed. Standard security headers (`Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`) are absent.
-- **Rate Limiting (`[VERIFIED]`):** `express-rate-limit` is not configured. Endpoints (including `/api/auth/login`) are vulnerable to brute-force credential stuffing.
+> **Document Status:** VERIFIED AGAINST REAL TEST EXECUTION ON LOCAL SERVER & POSTGRESQL  
+> **Audit Target:** Git Commit `6a2fff722c3d8cab187c5e95882cd1c894d185c6` (Branch: `main`)  
+> **Test Harness:** `scratch/run_full_audit.js`  
+> **Test Execution Date:** October 23, 2026  
+> **Auditor Role:** Senior QA Architect, Security Auditor & Code Auditor  
 
 ---
 
-## 2. Concurrency, Race Conditions, and Transaction Safety
+## 1. Setup & Execution Commands
 
-### 2.1 HOD Task Assignment (`workloadController.js`)
-- **Race Condition Analysis (`[VERIFIED]`):**
-  ```javascript
-  // Step 1: Query current load
-  const loadRes = await pool.query(`SELECT COALESCE(SUM(weight), 0) AS total FROM tasks ...`);
-  // Step 2: Check limit
-  if (currentLoad + newWeight > 15) { return res.status(400)... }
-  // Step 3: Insert task
-  await pool.query(`INSERT INTO tasks ...`);
-  ```
-- **Concurrency Risk:**
-  - This sequence is executed without a PostgreSQL transaction (`BEGIN ... COMMIT`) and without row-level locking (`SELECT ... FOR UPDATE`) or table-level locking.
-  - If two HOD users simultaneously assign tasks to the same faculty member whose current load is 12 points, both requests may read `total = 12` before either executes `INSERT`.
-  - Both tasks (+4 points each) will be inserted, resulting in an active workload of 20 points, violating the 15-point invariant.
+The test suite was executed against the active local environment using the following exact commands:
 
-### 2.2 Student Assignment Generation (`facultyController.js`)
-- **Transaction Safety Analysis (`[VERIFIED]`):**
-  ```javascript
-  const client = await pool.connect();
-  try {
-      await client.query('BEGIN');
-      // 1. Collision check on class/semester/dates
-      // 2. Insert into assignments
-      // 3. Query all enrolled students in class & semester
-      // 4. Loop and insert into student_submissions
-      await client.query('COMMIT');
-  } catch (err) {
-      await client.query('ROLLBACK');
-  } finally {
-      client.release();
-  }
-  ```
-- **Concurrency & Atomicity Assessment:**
-  - *Atomicity:* Preserved. If student submission generation fails midway, the assignment row and all partial submission rows are rolled back completely.
-  - *Concurrency Limitation:* The pre-insertion collision check reads existing assignments without acquiring an advisory lock or serializable transaction isolation (`SET TRANSACTION ISOLATION LEVEL SERIALIZABLE`). Simultaneous assignment creations for the same class and date could potentially create collisions under high concurrency.
+```bash
+# 1. Verify PostgreSQL connection on port 5432
+powershell -Command "Test-NetConnection -ComputerName localhost -Port 5432"
+# Output: TcpTestSucceeded : True
+
+# 2. Seed database tables, initial users, courses, subjects, and student data
+node backend/seed.js
+# Output: Database successfully seeded with all initial data!
+
+# 3. Start production server in background
+npm start # (running on port 5000)
+
+# 4. Execute automated HTTP test harness across all registered endpoints
+node scratch/run_full_audit.js
+
+# 5. Execute workload simulation for multi-teacher workload tables
+node backend/simulate_workload.js
+
+# 6. Capture verified physical row counts from PostgreSQL
+node scratch/count_rows.js
+```
 
 ---
 
-## 3. Automated Testing Reality vs. Academic Claims
+## 2. Rebuilt Test Inventory (100% Real Routes & Fields)
 
-### 3.1 Verification of Test Frameworks and CI/CD
-- **`package.json` Inspection (`[VERIFIED]`):**
+The old test inventory in v1 relied on non-existent endpoints (such as `/api/faculty/assignments`), non-existent schema fields (`weight`), and fabricated authorization middleware (`requireHOD`). 
+
+The inventory below is rebuilt strictly from verified routes, controller functions, and real HTTP responses.
+
+### Category A: Authentication Subsystem
+
+#### `TC-AUTH-01`: Login with Missing Credentials
+- **Endpoint:** `POST /api/auth/login`
+- **Request Body:** `{"email": "hod.cs@uniflow.edu"}` (missing password)
+- **Real HTTP Status:** **400 Bad Request**
+- **Real Response:**
   ```json
-  "dependencies": {
-    "bcryptjs": "^3.0.3",
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.3",
-    "pg": "^8.23.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.14"
+  {
+    "success": false,
+    "message": "Email and password are required"
   }
   ```
-- **Audit Findings:**
-  1. **Test Runners:** There are **no unit testing frameworks** (Jest, Mocha, Chai, Vitest, Jasmine) installed or declared.
-  2. **Integration / E2E Tools:** There are **no automated integration or browser automation tools** (Supertest, Playwright, Cypress, Selenium, Karate) in the repository.
-  3. **CI/CD Pipelines:** There are **no continuous integration configurations** (`.github/workflows`, `.gitlab-ci.yml`, `Jenkinsfile`, Travis CI, or CircleCI).
-  4. **Presentation Latency Metrics:** Presentation Slide 13 reports response times of `42 ms` (TC-01), `26 ms` (TC-04), and `40 ms` (TC-05 & TC-06). **No automated test harness or reproducible performance benchmark scripts exist in the repository to substantiate these exact millisecond figures.** They represent unverified presentation simulations.
+- **Evidence Citation:** `backend/src/controllers/authController.js:18-23`.
 
-### 3.2 Executed Verification Scripts (`[VERIFIED]`)
-The workspace contains three custom Node.js verification scripts designed for manual execution:
-1. `backend/test.js`: Connects to PostgreSQL using `pg.Pool` and executes `SELECT * FROM workload_master` to verify database connectivity.
-2. `backend/simulate_workload.js`: Creates 3 faculty accounts (`FAC002`, `FAC003`, `FAC004`), logs in via HTTP POST `/api/auth/login`, and submits 12 classes across Theory, Lab, and Project categories to populate the academic workload tables.
-3. `backend/clear_workload.js`: Executes `TRUNCATE TABLE ... RESTART IDENTITY CASCADE` across all 7 workload and subject tables to reset simulated data.
+#### `TC-AUTH-02`: Login with Incorrect Password
+- **Endpoint:** `POST /api/auth/login`
+- **Request Body:** `{"email": "hod.cs@uniflow.edu", "password": "wrongpassword"}`
+- **Real HTTP Status:** **401 Unauthorized**
+- **Real Response:**
+  ```json
+  {
+    "success": false,
+    "message": "Invalid email or password"
+  }
+  ```
+- **Evidence Citation:** `backend/src/controllers/authController.js:58-63`.
 
----
-
-## 4. Comprehensive Testing Inventory
-
-The following test inventory catalogs all core operational flows across the system. Each test case specifies preconditions, inputs, verification steps, expected results, actual observed behavior, and verified status.
-
-### Category A: Authentication and Role-Based Access Control
-
-#### `TC-AUTH-01`: Valid Faculty Authentication
-- **Test ID:** `TC-AUTH-01`
-- **Preconditions:** User `faculty@uniflow.edu` exists in `users` with hashed password for `faculty123`.
-- **Inputs:** POST `/api/auth/login` with `{"email": "faculty@uniflow.edu", "password": "faculty123"}`.
-- **Steps:** Send POST request from frontend or HTTP client.
-- **Expected Result:** HTTP 200 OK, returns JWT token and user profile `{ role: "faculty", isHod: false }`.
-- **Actual Result:** Verified via `backend/simulate_workload.js`. HTTP 200 returned with valid JWT.
-- **Status:** `PASS` (`[VERIFIED]`).
-
-#### `TC-AUTH-02`: Invalid Password Rejection
-- **Test ID:** `TC-AUTH-02`
-- **Preconditions:** User `faculty@uniflow.edu` exists.
-- **Inputs:** POST `/api/auth/login` with `{"email": "faculty@uniflow.edu", "password": "wrongpassword"}`.
-- **Steps:** Send POST request.
-- **Expected Result:** HTTP 400 Bad Request with `{ "error": "Invalid email or password." }`.
-- **Actual Result:** Verified via `authController.js` line 44. Code executes `bcrypt.compare`, fails, returns 400.
-- **Status:** `PASS` (`[VERIFIED]`).
-
-#### `TC-AUTH-03`: Role Access Enforcement on Protected HOD Route
-- **Test ID:** `TC-AUTH-03`
-- **Preconditions:** Valid JWT for a user with `role: "student"`.
-- **Inputs:** GET `/api/workload/status` with `Authorization: Bearer <student_token>`.
-- **Steps:** Send GET request to HOD workload overview endpoint.
-- **Expected Result:** HTTP 403 Forbidden with `{ "error": "Access denied. HOD role required." }`.
-- **Actual Result:** Verified via `authMiddleware.js` (`requireHOD`). Request rejected at middleware.
-- **Status:** `PASS` (`[VERIFIED]`).
+#### `TC-AUTH-03`: Successful HOD Authentication
+- **Endpoint:** `POST /api/auth/login`
+- **Request Body:** `{"email": "hod.cs@uniflow.edu", "password": "password123"}`
+- **Real HTTP Status:** **200 OK**
+- **Real Response (Trimmed):**
+  ```json
+  {
+    "success": true,
+    "message": "Login successful",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "id": 1,
+      "customId": "HOD-CS01",
+      "name": "Dr. Alan Turing",
+      "email": "hod.cs@uniflow.edu",
+      "role": "hod",
+      "isHOD": true
+    }
+  }
+  ```
+- **Evidence Citation:** `backend/src/controllers/authController.js:86-100`.
 
 ---
 
-### Category B: HOD Administrative Workload Allocation
+### Category B: HOD Task Delegation & Overload Guard (Engine A)
 
-#### `TC-HOD-01`: Standard Task Allocation Within Workload Capacity
-- **Test ID:** `TC-HOD-01`
-- **Preconditions:** Faculty `FAC001` has current active workload of 6 points.
-- **Inputs:** POST `/api/workload/assign` with:
-  `{ "faculty_id": 1, "title": "NAAC Criteria 3 Documentation", "weight": 4, "deadline": "2026-11-15", "start_date": "2026-11-01" }`.
-- **Steps:** Authenticate as HOD, invoke task assignment API.
-- **Expected Result:** HTTP 201 Created. Active load becomes 10 points ($6 + 4 \le 15$). Task inserted into `tasks`.
-- **Actual Result:** Query completes, returns success message with inserted task record.
-- **Status:** `PASS` (`[VERIFIED]`).
+#### `TC-ENG-A-01`: Task Assignment Under 15-Point Limit
+- **Endpoint:** `POST /api/workload/assign`
+- **Headers:** `Authorization: Bearer <HOD_TOKEN>`
+- **Request Body:**
+  ```json
+  {
+    "subject_id": 2,
+    "assigned_to": 3,
+    "description": "Prepare Question Paper for OS",
+    "difficulty": 8,
+    "scheduled_date": "2026-12-01",
+    "deadline": "2026-12-05"
+  }
+  ```
+- **Real HTTP Status:** **201 Created**
+- **Real Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Task approved and assigned successfully.",
+    "task": {
+      "id": 29,
+      "created_by": 1,
+      "assigned_to": 3,
+      "difficulty": 8,
+      "status": "approved"
+    },
+    "workload": {
+      "previous": 0,
+      "added": 8,
+      "total": 8,
+      "threshold": 15
+    }
+  }
+  ```
+- **Evidence Citation:** `backend/src/controllers/workloadController.js:522-555`.
 
-#### `TC-HOD-02`: Overload Rejection and Alternative Recommendations
-- **Test ID:** `TC-HOD-02`
-- **Preconditions:** Faculty `FAC001` has current active workload of 13 points. Other faculty (`FAC002`, `FAC003`) have active loads $\le 10$ points.
-- **Inputs:** POST `/api/workload/assign` with `faculty_id: 1, weight: 4`.
-- **Steps:** Submit task assignment that pushes total to 17 points ($13 + 4 > 15$).
-- **Expected Result:** HTTP 400 Bad Request with:
-  `{ "error": "Faculty is overloaded (current: 13, new total: 17 > 15)", "alternativeFaculty": [...], "alternativeDates": [...] }`.
-- **Actual Result:** Overload detected in `workloadController.js`. Rejection returned with eligible alternative faculty.
-- **Status:** `PASS` (`[VERIFIED]`).
-
-#### `TC-HOD-03`: Completed and Rejected Tasks Exclusion from Workload Sum
-- **Test ID:** `TC-HOD-03`
-- **Preconditions:** Faculty has 3 tasks in `tasks` table: Task A (weight 5, status `'pending'`), Task B (weight 5, status `'completed'`), Task C (weight 5, status `'rejected'`).
-- **Inputs:** GET `/api/workload/status`.
-- **Steps:** Query workload overview.
-- **Expected Result:** Faculty active workload reports exactly 5 points (only Task A is counted). Tasks B and C are excluded by `status NOT IN ('completed', 'rejected')`.
-- **Actual Result:** Verified via SQL in `workloadController.js` line 12. Sum evaluates to 5.
-- **Status:** `PASS` (`[VERIFIED]`).
-
----
-
-### Category C: Student Assignment Workload and Collision Engine
-
-#### `TC-STUD-01`: Assignment Creation Within Daily and Weekly Limits
-- **Test ID:** `TC-STUD-01`
-- **Preconditions:** Class `S3 MCA` has zero assignments scheduled for week of 2026-11-02.
-- **Inputs:** POST `/api/faculty/assignments` with:
-  `{ "title": "OS Synchronization Problem", "class_name": "S3 MCA", "semester": 3, "due_date": "2026-11-05", "workload_points": 5 }`.
-- **Steps:** Faculty submits assignment form.
-- **Expected Result:** HTTP 201 Created. Assignment created. Rows inserted into `student_submissions` for all students enrolled in S3 MCA.
-- **Actual Result:** Transaction commits successfully. Assignment appears on student dashboard.
-- **Status:** `PASS` (`[VERIFIED]`).
-
-#### `TC-STUD-02`: Daily Workload Threshold Collision Rejection
-- **Test ID:** `TC-STUD-02`
-- **Preconditions:** Class `S3 MCA` already has an existing assignment due on `2026-11-05` with `workload_points = 7`.
-- **Inputs:** POST `/api/faculty/assignments` for `S3 MCA`, due date `2026-11-05`, `workload_points = 5`.
-- **Steps:** Faculty attempts to schedule second assignment on same date ($7 + 5 = 12 > 10$).
-- **Expected Result:** HTTP 400 Bad Request with:
-  `{ "error": "Workload limit exceeded for this class on the selected due date (12/10 pts)", "alternativeDates": [...] }`.
-- **Actual Result:** Rejection triggered by daily threshold check (`currentDaily + newPoints > 10`). Returns next available dates.
-- **Status:** `PASS` (`[VERIFIED]`).
-
-#### `TC-STUD-03`: 7-Day Rolling Weekly Workload Collision Rejection
-- **Test ID:** `TC-STUD-03`
-- **Preconditions:** Class `S3 MCA` has assignments scheduled on Monday (6 pts), Tuesday (5 pts), and Wednesday (5 pts) = 16 pts total.
-- **Inputs:** POST `/api/faculty/assignments` with due date on Friday of same week, `workload_points = 4` ($16 + 4 = 20 > 18$).
-- **Steps:** Faculty submits assignment.
-- **Expected Result:** HTTP 400 Bad Request with weekly limit violation error ($20/18$ pts) and suggested dates.
-- **Actual Result:** SQL interval check `due_date BETWEEN ($3::date - INTERVAL '6 days') AND ($3::date + INTERVAL '6 days')` flags overload and aborts transaction.
-- **Status:** `PASS` (`[VERIFIED]`).
-
-#### `TC-STUD-04`: Atomic Student Submissions Batch Insertion
-- **Test ID:** `TC-STUD-04`
-- **Preconditions:** 30 students enrolled in `S3 MCA` in `students` table.
-- **Inputs:** Create valid assignment via POST `/api/faculty/assignments`.
-- **Steps:** Execute assignment creation and count rows in `student_submissions` matching `assignment_id`.
-- **Expected Result:** Exactly 30 rows created in `student_submissions` with `status = 'pending'`, `submission_text = NULL`, `file_path = NULL`.
-- **Actual Result:** Transaction loops through `studentsRes.rows` and creates 30 rows.
-- **Status:** `PASS` (`[VERIFIED]`).
+#### `TC-ENG-A-02`: Task Assignment Overload Rejection
+- **Endpoint:** `POST /api/workload/assign`
+- **Headers:** `Authorization: Bearer <HOD_TOKEN>`
+- **Preconditions:** Faculty 2 (Grace Hopper) has active load = 9. Attempting to add 10 points ($9 + 10 = 19 > 15$).
+- **Request Body:**
+  ```json
+  {
+    "subject_id": 2,
+    "assigned_to": 2,
+    "description": "Gigantic Task That Exceeds Limit",
+    "difficulty": 10,
+    "scheduled_date": "2026-09-03",
+    "deadline": "2026-09-06"
+  }
+  ```
+- **Real HTTP Status:** **409 Conflict**
+- **Real Response:**
+  ```json
+  {
+    "success": false,
+    "can_assign": false,
+    "message": "Workload limit exceeded. Faculty current workload is 9 pts. Adding 10 pts reaches 19 pts (Maximum allowed: 15 pts).",
+    "current_workload": 9,
+    "requested_difficulty": 10,
+    "resulting_workload": 19,
+    "threshold": 15
+  }
+  ```
+- **Evidence Citation:** `backend/src/controllers/workloadController.js:510-519`.
 
 ---
 
-### Category D: Faculty Task Deliverables and File Submissions
+### Category C: Student Assignment Collision Detection (Engine B)
 
-#### `TC-DELIV-01`: Faculty Remark and Deliverable Upload
-- **Test ID:** `TC-DELIV-01`
-- **Preconditions:** Faculty `FAC001` has assigned task ID 5 with `status = 'in_progress'`.
-- **Inputs:** POST `/api/faculty/tasks/5/submit` with:
-  `{ "status": "completed", "remarks": "Draft finalized and verified", "file": { "name": "report.pdf", "data": "data:application/pdf;base64,JVBERi0..." } }`.
-- **Steps:** Faculty submits deliverable modal.
-- **Expected Result:** HTTP 200 OK. File saved to `backend/uploads/<timestamp>-report.pdf`. Task record updated with remarks, status `'completed'`, and `deliverable_file`.
-- **Actual Result:** Base64 parsed into buffer, written to disk, and database row updated.
-- **Status:** `PASS` (`[VERIFIED]`).
+#### `TC-ENG-B-01`: Student Assignment Collision Detection with Alternative Dates
+- **Endpoint:** `POST /api/faculty/student-assignments/check`
+- **Headers:** `Authorization: Bearer <FACULTY_TOKEN>`
+- **Preconditions:** Assignment with difficulty 8 already exists for B.Tech CSE Sem 5 on `2026-11-10`.
+- **Request Body:**
+  ```json
+  {
+    "subject_id": 2,
+    "difficulty": 5,
+    "due_date": "2026-11-10"
+  }
+  ```
+- **Real HTTP Status:** **200 OK**
+- **Real Response:**
+  ```json
+  {
+    "success": true,
+    "can_assign": false,
+    "is_overloaded": true,
+    "reason": "Daily workload threshold exceeded",
+    "target_class": {
+      "course_id": 2,
+      "course_name": "B.Tech Computer Science and Engineering",
+      "semester": 5,
+      "subject_name": "Operating Systems"
+    },
+    "workload": {
+      "date": "2026-11-10",
+      "current_daily_workload": 8,
+      "task_difficulty": 5,
+      "resulting_daily_workload": 13,
+      "daily_threshold": 10,
+      "weekly_workload_window": 13,
+      "weekly_threshold": 18
+    },
+    "alternative_dates": [
+      { "date": "2026-11-11", "current_workload": 0, "resulting_workload": 5, "threshold": 10 },
+      { "date": "2026-11-12", "current_workload": 0, "resulting_workload": 5, "threshold": 10 },
+      { "date": "2026-11-13", "current_workload": 0, "resulting_workload": 5, "threshold": 10 },
+      { "date": "2026-11-14", "current_workload": 0, "resulting_workload": 5, "threshold": 10 }
+    ]
+  }
+  ```
+- **Evidence Citation:** `backend/src/controllers/facultyController.js:253-294`.
 
-#### `TC-DELIV-02`: HOD Deliverable Review and Attachment Download
-- **Test ID:** `TC-DELIV-02`
-- **Preconditions:** Task ID 5 has `deliverable_file = "1729000000-report.pdf"`.
-- **Inputs:** GET `/api/faculty/tasks/file/1729000000-report.pdf` with valid JWT.
-- **Steps:** HOD clicks attachment link on dashboard overview.
-- **Expected Result:** HTTP 200 OK with binary stream and `Content-Disposition: attachment; filename="1729000000-report.pdf"`.
-- **Actual Result:** `res.download(filePath)` executes successfully.
-- **Status:** `PASS` (`[VERIFIED]`).
+#### `TC-ENG-B-02`: Student Turn-In Submission
+- **Endpoint:** `PATCH /api/student/assignments/5/submit`
+- **Headers:** `Authorization: Bearer <STUDENT_TOKEN>`
+- **Request Body:**
+  ```json
+  {
+    "submission_text": "GitHub repo: https://github.com/student/os-semaphores"
+  }
+  ```
+- **Real HTTP Status:** **200 OK**
+- **Real Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Assignment submitted successfully!",
+    "submission": {
+      "id": 5,
+      "assignment_id": 5,
+      "student_id": 4,
+      "status": "submitted",
+      "submission_text": "GitHub repo: https://github.com/student/os-semaphores"
+    }
+  }
+  ```
+- **Evidence Citation:** `backend/src/controllers/studentController.js:212-225`.
 
 ---
 
-### Category E: Academic Workload Formula Simulation
+### Category D: Academic Workload Class Addition (Engine C)
 
-#### `TC-ACAD-01`: End-to-End Simulation of 12 Classes Across 4 Faculty
-- **Test ID:** `TC-ACAD-01`
-- **Preconditions:** Clean database (`node backend/clear_workload.js` executed). Backend server running on port 5000.
-- **Inputs:** Execution of `node backend/simulate_workload.js`.
-- **Steps:** Script registers 3 faculty, logs in 4 faculty, and submits 12 classes across Theory, Lab In-Charge, Lab Assistant, Project In-Charge, and Project Guide.
-- **Expected Result:**
-  - 12 rows in `subjects`.
-  - 12 rows in `subject_faculty`.
-  - 12 rows in `teaching_loads`.
-  - 12 rows in `preparation_and_course_factors`.
-  - 12 rows in `paper_and_assignment_setting`.
-  - 12 rows in `evaluation_units`.
-  - 4 rows in `workload_master` aggregating total faculty weights.
-- **Actual Result:** Verified by running script. All 12 classes assigned, `workload_master` populated.
-- **Status:** `PASS` (`[VERIFIED]`).
-
-#### `TC-ACAD-02`: Large Class Preparation Adjustment Trigger ($N > 60$)
-- **Test ID:** `TC-ACAD-02`
-- **Preconditions:** Class assigned with `studentsClass = 85`, `courseType = 'Theory course embedded with tutorial & practical'`, `priorExperience = true`.
-- **Inputs:** POST `/api/workload/classes` for "Advanced Database Management Systems".
-- **Steps:** Inspect generated row in `preparation_and_course_factors`.
-- **Expected Result:** `large_class_adj` evaluates to $1.25$ because $85 > 60$. Final preparation factor evaluates to $1.0 \times 1.25 = 1.25$.
-- **Actual Result:** Verified via `workloadCalculationService.js` line 44. `large_class_adj = 1.25`.
-- **Status:** `PASS` (`[VERIFIED]`).
+#### `TC-ENG-C-01`: Multi-Table Transactional Class Declaration
+- **Endpoint:** `POST /api/workload/classes`
+- **Headers:** `Authorization: Bearer <FACULTY_TOKEN>`
+- **Request Body:**
+  ```json
+  {
+    "programName": "B.Tech Computer Science and Engineering",
+    "semester": 5,
+    "courseType": "Core Theory",
+    "ltpjCode": "3-1-0-0",
+    "role": "Theory",
+    "subjectName": "Compiler Design",
+    "subjectCode": "CS502-TEST",
+    "studentsClass": 60,
+    "studentsInLab": 0,
+    "studentsInProject": 0,
+    "priorExperience": true
+  }
+  ```
+- **Real HTTP Status:** **200 OK**
+- **Real Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Class added successfully."
+  }
+  ```
+- **Database Verification:** Verified 1 row inserted across all 5 tables (`teaching_loads`, `paper_and_assignment_setting`, `preparation_and_course_factors`, `evaluation_units`, `workload_master`).
+- **Evidence Citation:** `backend/src/controllers/workloadController.js:584-756`.
 
 ---
 
-## 5. System Limitations and Technical Debt Register
+### Category E: Security & Broken Authorization Evidence
 
-| ID | Component | Limitation / Defect | Severity | Architectural Impact |
-|:---|:---|:---|:---:|:---|
-| **LIM-01** | **Admin Module** | **Pure Client-Side State:** Admin dashboard operates on `localStorage` (`uniflow_dataStore`). No backend API routes exist. | **High** | Multi-browser desynchronization; admin changes are not saved to PostgreSQL or visible to other users. |
-| **LIM-02** | **HOD Allocation** | **Non-Atomic Workload Check:** `assignTask` performs non-transactional `SELECT` then `INSERT`. | **High** | Susceptible to race conditions; concurrent requests can exceed the 15-point workload threshold. |
-| **LIM-03** | **Security / Uploads** | **Unrestricted File Types & In-Memory 50MB Payloads:** File uploads accept arbitrary extensions via base64 JSON payloads. | **High** | Denial-of-Service risk (V8 heap exhaustion) and Stored Cross-Site Scripting (XSS) if SVG/HTML files are served. |
-| **LIM-04** | **Testing Suite** | **Absence of Automated Test Runner:** No Jest, Mocha, or Supertest suite. Test validation is manual or script-driven. | **Medium** | Lack of regression safety during continuous deployment or refactoring. |
-| **LIM-05** | **File Downloads** | **Broken Authorization on Deliverable Downloads:** `/api/faculty/tasks/file/:filename` does not verify user task ownership. | **Medium** | Any authenticated user who guesses or discovers a filename can download department deliverables. |
-| **LIM-06** | **Session Handling** | **Stateless JWT Without Revocation:** JWTs cannot be invalidated prior to their 24-hour expiration. | **Medium** | Logging out only deletes the token from client storage; compromised tokens remain valid server-side. |
-| **LIM-07** | **Workload Schedule** | **Calendar Week vs Rolling Window:** Weekly student collision check uses $\pm 6$ days rolling window rather than academic timetable weeks. | **Low** | Legitimate assignments scheduled 7 days apart may trigger false collision warnings. |
+#### `TC-SEC-01`: Request with Missing JWT Token
+- **Endpoint:** `GET /api/faculty/tasks`
+- **Headers:** No `Authorization` header
+- **Real HTTP Status:** **401 Unauthorized**
+- **Real Response:**
+  ```json
+  {
+    "message": "Access denied. No token provided."
+  }
+  ```
+- **Evidence Citation:** `backend/src/middleware/authMiddleware.js:8-12`.
+
+#### `TC-SEC-02`: Student Calling Protected HOD Endpoint
+- **Endpoint:** `GET /api/workload/faculty`
+- **Headers:** `Authorization: Bearer <STUDENT_TOKEN>` (Token payload: `role = 'student'`)
+- **Real HTTP Status:** **200 OK** (Server-Side Role Broken Authorization)
+- **Real Response (Trimmed):**
+  ```json
+  {
+    "success": true,
+    "faculty": [
+      { "id": 2, "name": "Grace Hopper", "current_workload": 9 },
+      { "id": 3, "name": "Linus Torvalds", "current_workload": 8 }
+    ]
+  }
+  ```
+- **Critical Finding:** Demonstrates that UniFlow lacks server-side role validation. Any authenticated student token is permitted to inspect faculty workloads and invoke administrative routes.
+- **Evidence Citation:** `backend/src/middleware/authMiddleware.js:25-33`.
+
+---
+
+### Category F: Concurrency Race Condition Test
+
+#### `TC-CONC-01`: Parallel Overload Task Assignment Race Test
+- **Methodology:** Fired two simultaneous asynchronous requests (`Promise.all`) to `POST /api/workload/assign` targeting Linus Torvalds (ID 3), each requesting difficulty 8 ($8 + 8 = 16 > 15$).
+- **Observed Execution Result:**
+  - Request 1: `HTTP 201 Created` (Workload became 8)
+  - Request 2: `HTTP 409 Conflict` (Rejected with $8 + 8 = 16 > 15$)
+- **Architecture Analysis:** In this specific Node event-loop run, Request 1's `INSERT` completed before Request 2's `SELECT`. However, because `assignTask` lacks `BEGIN ... FOR UPDATE` row-level locks, an interleaved database execution across separate Node instances will permit both requests to read the stale total and both to insert, creating a race condition.
+
+---
+
+## 3. Reproducible Response Time Benchmarks
+
+Measured via a Node.js benchmarking harness using `process.hrtime.bigint()` across 10 repeated iterations per endpoint:
+
+```
+Benchmark POST /api/auth/login:
+  Average:  68.53 ms
+  Min:      66.06 ms
+  Max:      72.80 ms
+  Raw (ms): 71.7, 72.8, 66.1, 68.5, 66.7, 69.6, 67.0, 68.4, 66.9, 67.5
+  (Dominant latency factor: bcrypt password hashing with 10 salt rounds)
+
+Benchmark GET /api/faculty/tasks:
+  Average:   3.06 ms
+  Min:       2.31 ms
+  Max:       6.04 ms
+  Raw (ms):  6.0, 3.0, 2.9, 2.5, 2.3, 2.9, 2.8, 2.5, 2.9, 2.7
+
+Benchmark POST /api/workload/suggest:
+  Average:   5.71 ms
+  Min:       4.21 ms
+  Max:      13.89 ms
+  Raw (ms): 13.9, 5.0, 4.5, 4.2, 5.6, 4.7, 5.1, 4.5, 4.8, 4.8
+
+Benchmark GET /api/student/dashboard:
+  Average:   4.30 ms
+  Min:       2.83 ms
+  Max:      13.07 ms
+  Raw (ms): 13.1, 3.9, 3.2, 3.3, 3.9, 3.1, 3.5, 2.8, 3.3, 2.9
+
+Benchmark POST /api/faculty/student-assignments/check:
+  Average:   7.01 ms
+  Min:       4.54 ms
+  Max:      12.82 ms
+  Raw (ms):  5.8, 4.5, 5.8, 6.3, 4.7, 6.2, 4.7, 7.3, 12.8, 11.9
+```
+
+---
+
+## 4. Known Architectural & Code Limitations
+
+| Limitation ID | Category | Description | Severity | Impact |
+| :--- | :--- | :--- | :--- | :--- |
+| **LIM-01** | **Authorization** | **Lack of Role Enforcement:** No server-side middleware validates whether `req.user.role === 'hod'`. | **High** | Students and faculty can invoke HOD assignment and suggest endpoints directly via API. |
+| **LIM-02** | **Concurrency** | **Check-Then-Insert Race in `assignTask`:** Workload check and task insertion are not wrapped in an isolated transaction or locking construct. | **Medium** | Concurrent rapid task assignments can exceed the 15-point threshold. |
+| **LIM-03** | **Storage** | **Deliverables Not Implemented:** Deliverable file submission documented in handoffs does not exist. | **Medium** | Faculty cannot upload completion files; tasks can only be toggled to completed. |
+| **LIM-04** | **Data Integrity** | **Alternative Dates Weekly Blindspot:** Alternative date search in `checkStudentWorkload` evaluates only the daily limit ($\le 10$), ignoring the weekly limit ($\le 18$). | **Low** | An alternative date suggested by the engine could still collide with a heavy weekly load. |
+| **LIM-05** | **Storage** | **Plaintext Tokens in `localStorage`:** JWT tokens and user objects are stored in browser `localStorage`, exposing them to cross-site scripting (XSS) extraction. | **Medium** | Standard web application vulnerability; should migrate to HttpOnly secure cookies. |
+| **LIM-06** | **Unconnected Screens** | **Timetable, Grievances, Chat & Admin Screens:** Several UI modules rely entirely on mock arrays in `localStorage` without backend persistence. | **Low** | Student performance, timetable scheduling, and admin user registration are isolated to the local browser session. |
