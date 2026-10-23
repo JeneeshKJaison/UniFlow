@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS subjects (
     code VARCHAR(50) UNIQUE NOT NULL,
     semester INT NOT NULL,
     credits INT DEFAULT 3,
+    course_type VARCHAR(255),
+    ltpj_code VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -57,6 +59,7 @@ CREATE TABLE IF NOT EXISTS subject_faculty (
     id SERIAL PRIMARY KEY,
     subject_id INT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
     faculty_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role VARCHAR(100) DEFAULT 'Theory',
     UNIQUE(subject_id, faculty_id)
 );
 
@@ -116,4 +119,134 @@ CREATE TABLE IF NOT EXISTS student_assignment_submissions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(assignment_id, student_id)
 );
+
+-- 11. Teaching Loads Table
+CREATE TABLE IF NOT EXISTS teaching_loads (
+    id SERIAL PRIMARY KEY,
+    subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
+    subject_name VARCHAR(255),
+    faculty_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    faculty_name VARCHAR(255),
+    students_in_class INTEGER DEFAULT 60,
+    theory_hours NUMERIC DEFAULT 0,
+    lab_hours NUMERIC DEFAULT 0,
+    project_hours NUMERIC DEFAULT 0,
+    tutorial_hours NUMERIC DEFAULT 0,
+    students_in_lab INTEGER DEFAULT 0,
+    students_in_project INTEGER DEFAULT 0,
+    subtotal_weighted_units NUMERIC DEFAULT 0,
+    total_load NUMERIC DEFAULT 0
+);
+
+-- 12. Paper and Assignment Setting Table
+CREATE TABLE IF NOT EXISTS paper_and_assignment_setting (
+    id SERIAL PRIMARY KEY,
+    subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
+    subject_name VARCHAR(255),
+    faculty_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    faculty_name VARCHAR(255),
+    num_question_papers INTEGER DEFAULT 0,
+    num_assignments INTEGER DEFAULT 2,
+    num_question_bank INTEGER DEFAULT 0,
+    subtotal_setting_units NUMERIC DEFAULT 0
+);
+
+-- 13. Preparation and Course Factors Table
+CREATE TABLE IF NOT EXISTS preparation_and_course_factors (
+    id SERIAL PRIMARY KEY,
+    subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
+    subject_name VARCHAR(255),
+    faculty_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    faculty_name VARCHAR(255),
+    theory_subject_prep NUMERIC DEFAULT 0,
+    theory_rubrics_prep NUMERIC DEFAULT 0,
+    theory_copo_mapping NUMERIC DEFAULT 0,
+    lab_experiments_prep NUMERIC DEFAULT 0,
+    lab_rubrics_prep NUMERIC DEFAULT 0,
+    lab_eval_sheets_prep NUMERIC DEFAULT 0,
+    lab_copo_mapping NUMERIC DEFAULT 0,
+    project_rubrics_prep NUMERIC DEFAULT 0,
+    project_eval_sheets_prep NUMERIC DEFAULT 0,
+    project_copo_mapping NUMERIC DEFAULT 0,
+    project_scheduling NUMERIC DEFAULT 0,
+    extra_additions NUMERIC DEFAULT 0,
+    total_load NUMERIC DEFAULT 0
+);
+
+-- 14. Evaluation Units Table
+CREATE TABLE IF NOT EXISTS evaluation_units (
+    id SERIAL PRIMARY KEY,
+    subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
+    subject_name VARCHAR(255),
+    faculty_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    faculty_name VARCHAR(255),
+    series_answer_scripts NUMERIC DEFAULT 0,
+    end_sem_answer_scripts NUMERIC DEFAULT 0,
+    assignment_scripts NUMERIC DEFAULT 0,
+    lab_output_evaluations NUMERIC DEFAULT 0,
+    practical_exam_evals NUMERIC DEFAULT 0,
+    viva_voce_count NUMERIC DEFAULT 0,
+    project_evaluations NUMERIC DEFAULT 0,
+    subtotal_evaluation_units NUMERIC DEFAULT 0
+);
+
+-- 15. Workload Master Table
+CREATE TABLE IF NOT EXISTS workload_master (
+    id SERIAL PRIMARY KEY,
+    subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
+    subject_name VARCHAR(255),
+    faculty_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    faculty_name VARCHAR(255),
+    teaching_load_units NUMERIC DEFAULT 0,
+    question_setting_units NUMERIC DEFAULT 0,
+    prep_adjustment_units NUMERIC DEFAULT 0,
+    evaluation_units NUMERIC DEFAULT 0,
+    theory_hours_per_week NUMERIC DEFAULT 0,
+    experience_multiplier NUMERIC DEFAULT 1,
+    grand_total_workload_units NUMERIC DEFAULT 0
+);
+
+-- 16. Department Roles Master Table
+CREATE TABLE IF NOT EXISTS department_roles_master (
+    id VARCHAR(10) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    category VARCHAR(100) DEFAULT 'Department',
+    source_pages VARCHAR(50),
+    responsibility_summary TEXT
+);
+
+-- 17. Department Tasks Master Table
+CREATE TABLE IF NOT EXISTS department_tasks_master (
+    id VARCHAR(10) PRIMARY KEY,
+    role_id VARCHAR(10) REFERENCES department_roles_master(id) ON DELETE CASCADE,
+    role_name VARCHAR(255) NOT NULL,
+    responsibility_task VARCHAR(255) NOT NULL,
+    work_unit VARCHAR(100) NOT NULL,
+    std_effort NUMERIC(6, 2) NOT NULL,
+    occurrences_per_semester INTEGER NOT NULL,
+    complexity_factor NUMERIC(4, 2) NOT NULL,
+    validation_note TEXT
+);
+
+-- 18. Faculty Department Workload Allocations Table
+CREATE TABLE IF NOT EXISTS faculty_department_workload (
+    id SERIAL PRIMARY KEY,
+    faculty_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    faculty_name VARCHAR(255) NOT NULL,
+    role_id VARCHAR(10) REFERENCES department_roles_master(id) ON DELETE CASCADE,
+    role_name VARCHAR(255) NOT NULL,
+    task_id VARCHAR(10) REFERENCES department_tasks_master(id) ON DELETE CASCADE,
+    task_name VARCHAR(255) NOT NULL,
+    work_unit VARCHAR(100) NOT NULL,
+    quantity NUMERIC(10, 2) NOT NULL DEFAULT 1,
+    std_effort NUMERIC(6, 2) NOT NULL,
+    occurrences INTEGER NOT NULL,
+    complexity_factor NUMERIC(4, 2) NOT NULL,
+    calculated_workload NUMERIC(10, 2) NOT NULL,
+    remarks TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(faculty_id, task_id)
+);
+
 

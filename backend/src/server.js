@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const pool = require('./config/db');
@@ -17,6 +18,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, '../../UI')));
 app.use('/api/auth', authRoutes);
 app.use("/api/workload", workloadRoutes);
 app.use("/api/faculty", facultyRoutes);
@@ -34,7 +36,9 @@ app.get('/', (req, res) => {
 });
 
 
-// Auto-migrate task table columns if not exists & clear Linus Torvalds tasks
+const initWorkloadTables = require('./config/initWorkloadTables');
+
+// Auto-migrate task table columns if not exists & clear Linus Torvalds tasks & initialize workload tables
 (async () => {
     try {
         await pool.query(`
@@ -51,8 +55,11 @@ app.get('/', (req, res) => {
             RETURNING id
         `);
         console.log(`✓ Task columns verified. Cleared ${clearLinusRes.rowCount} workload tasks for Linus Torvalds.`);
+
+        // Ensure all workload tables and schema additions exist
+        await initWorkloadTables();
     } catch (e) {
-        console.error('Task column migration check error:', e.message);
+        console.error('Database initialization check error:', e.message);
     }
 })();
 

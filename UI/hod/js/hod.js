@@ -1514,14 +1514,109 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Workload Categories Configuration & Switching
+    const WORKLOAD_DOMAINS = {
+        'Department': {
+            buttonId: 'linkDepartmentWork',
+            title: 'Faculty-wise Department Workload Dashboard',
+            label: 'Department Workload',
+            icon: 'account_tree',
+            bg: 'rgba(99, 102, 241, 0.85)',
+            border: 'rgba(129, 140, 248, 1)'
+        },
+        'Institutional': {
+            buttonId: 'linkInstitutionalWork',
+            title: 'Faculty-wise Institutional Workload Dashboard',
+            label: 'Institutional Workload',
+            icon: 'corporate_fare',
+            bg: 'rgba(2, 132, 199, 0.85)',
+            border: 'rgba(56, 189, 248, 1)'
+        },
+        'ExtraProactive': {
+            buttonId: 'linkExtraWork',
+            title: 'Faculty-wise Extra Proactive Workload Dashboard',
+            label: 'Extra Proactive Workload',
+            icon: 'rocket_launch',
+            bg: 'rgba(16, 185, 129, 0.85)',
+            border: 'rgba(52, 211, 153, 1)'
+        },
+        'FDP_Workshop': {
+            buttonId: 'linkFdpWork',
+            title: 'Faculty-wise FDPs & Workshops Workload Dashboard',
+            label: 'FDPs & Workshops Workload',
+            icon: 'school',
+            bg: 'rgba(245, 158, 11, 0.85)',
+            border: 'rgba(251, 191, 36, 1)'
+        },
+        'Research': {
+            buttonId: 'linkResearchWork',
+            title: 'Faculty-wise Research Workload Dashboard',
+            label: 'Research Workload',
+            icon: 'biotech',
+            bg: 'rgba(139, 92, 246, 0.85)',
+            border: 'rgba(167, 139, 250, 1)'
+        },
+        'Consultancy': {
+            buttonId: 'linkConsultancyWork',
+            title: 'Faculty-wise Consultancy Workload Dashboard',
+            label: 'Consultancy Workload',
+            icon: 'handshake',
+            bg: 'rgba(20, 184, 166, 0.85)',
+            border: 'rgba(45, 212, 191, 1)'
+        }
+    };
+
+    let activeWorkloadCategory = 'Department';
+
     // Toggle to Sub-Links menu
     const linkAcademic = document.getElementById('linkAcademic');
-    if (linkAcademic) {
-        linkAcademic.addEventListener('click', () => {
-            document.getElementById('workloadQuickLinks').style.display = 'none';
-            document.getElementById('academicSubLinks').style.display = 'flex';
+    const deptDashboardContainer = document.getElementById('deptWorkloadDashboardContainer');
+
+    function setActiveCategoryButton(activeId) {
+        const allBtnIds = ['linkAcademic', 'linkDepartmentWork', 'linkInstitutionalWork', 'linkExtraWork', 'linkFdpWork', 'linkResearchWork', 'linkConsultancyWork'];
+        allBtnIds.forEach(id => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            if (id === activeId) {
+                btn.className = 'btn-primary';
+                btn.style.opacity = '1';
+            } else {
+                btn.className = 'btn-secondary';
+                btn.style.opacity = '1';
+            }
         });
     }
+
+    if (linkAcademic) {
+        linkAcademic.addEventListener('click', () => {
+            setActiveCategoryButton('linkAcademic');
+
+            document.getElementById('workloadQuickLinks').style.display = 'none';
+            document.getElementById('academicSubLinks').style.display = 'flex';
+            if (deptDashboardContainer) deptDashboardContainer.style.display = 'none';
+
+            // Ensure academic summary is rendered
+            renderWorkloadChart('grand_total_workload_units', 'Total Academic Workload');
+        });
+    }
+
+    // Attach click listeners for all 6 categories
+    Object.keys(WORKLOAD_DOMAINS).forEach(catKey => {
+        const domain = WORKLOAD_DOMAINS[catKey];
+        const btn = document.getElementById(domain.buttonId);
+        if (btn) {
+            btn.addEventListener('click', () => {
+                activeWorkloadCategory = catKey;
+                setActiveCategoryButton(domain.buttonId);
+
+                document.getElementById('academicSubLinks').style.display = 'none';
+                document.getElementById('workloadSubTableContainer').style.display = 'none';
+                if (deptDashboardContainer) deptDashboardContainer.style.display = 'block';
+
+                fetchAndRenderHodDeptWorkload(catKey);
+            });
+        }
+    });
 
     const backToMainLinks = document.getElementById('backToMainLinks');
     if (backToMainLinks) {
@@ -1529,6 +1624,9 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('academicSubLinks').style.display = 'none';
             document.getElementById('workloadQuickLinks').style.display = 'flex';
             document.getElementById('workloadSubTableContainer').style.display = 'none';
+            if (deptDashboardContainer) deptDashboardContainer.style.display = 'none';
+
+            setActiveCategoryButton('linkAcademic');
             
             // Revert chart to Grand Total
             renderWorkloadChart('grand_total_workload_units', 'Total Academic Workload');
@@ -1569,8 +1667,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Generate headers dynamically based on the first row's keys
-        // Filter out unnecessary columns like ids
         let keys = Object.keys(data[0]).filter(k => k !== 'id' && k !== 'subject_id' && k !== 'faculty_id' && k !== 'created_at');
         
         titleEl.textContent = tableName.replace(/_/g, ' ').toUpperCase() + ' DATA';
@@ -1587,7 +1683,6 @@ document.addEventListener('DOMContentLoaded', () => {
             bodyHtml += '<tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">';
             keys.forEach(k => {
                 let val = row[k];
-                // Format numbers if they have many decimals
                 if (typeof val === 'number' && !Number.isInteger(val)) {
                     val = val.toFixed(2);
                 }
@@ -1596,6 +1691,243 @@ document.addEventListener('DOMContentLoaded', () => {
             bodyHtml += '</tr>';
         });
         tbody.innerHTML = bodyHtml;
+    };
+
+    // =====================================================
+    // --- HOD MULTI-DOMAIN WORKLOAD OVERVIEW & CHART LOGIC ---
+    // =====================================================
+
+    let hodDeptSummaryData = null;
+
+    async function fetchAndRenderHodDeptWorkload(category = 'Department') {
+        const domain = WORKLOAD_DOMAINS[category] || WORKLOAD_DOMAINS['Department'];
+
+        // Update UI Header
+        const headerTitle = document.getElementById('deptDashboardHeaderText');
+        const headerIcon = document.getElementById('deptDashboardHeaderIcon');
+        if (headerTitle) headerTitle.textContent = domain.title;
+        if (headerIcon) headerIcon.textContent = domain.icon;
+
+        try {
+            const token = localStorage.getItem('uniflow_token');
+            const headers = {};
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+
+            const res = await fetch(`http://localhost:5000/api/workload/department/hod/summary?category=${category}`, {
+                headers: headers
+            });
+            const data = await res.json();
+            if (!data.success) return;
+
+            hodDeptSummaryData = data;
+
+            // Render Bar Chart for Selected Workload Category
+            renderHodDeptChart(data.faculty_summary, domain);
+
+            // Render Table Dashboard
+            renderHodDeptTable(data);
+
+        } catch (error) {
+            console.warn(`Backend unavailable, using mock summary for category ${category}:`, error);
+            const mockData = {
+                category: category,
+                department_total_hours: 45.00,
+                department_average_hours: 22.50,
+                faculty_summary: [
+                    {
+                        faculty_id: 2,
+                        custom_id: 'FAC001',
+                        faculty_name: 'Grace Hopper',
+                        department_workload_hours: 32.50,
+                        number_of_tasks: 2,
+                        workload_share_pct: 72.2,
+                        interpretation: 'Above department average',
+                        tasks: []
+                    },
+                    {
+                        faculty_id: 3,
+                        custom_id: 'FAC002',
+                        faculty_name: 'Linus Torvalds',
+                        department_workload_hours: 12.50,
+                        number_of_tasks: 1,
+                        workload_share_pct: 27.8,
+                        interpretation: 'Below department average',
+                        tasks: []
+                    }
+                ]
+            };
+            hodDeptSummaryData = mockData;
+            renderHodDeptChart(mockData.faculty_summary, domain);
+            renderHodDeptTable(mockData);
+        }
+    }
+
+    function renderHodDeptChart(facultySummary, domain = WORKLOAD_DOMAINS['Department']) {
+        const ctx = document.getElementById('workloadChart');
+        if (!ctx) return;
+
+        const labels = facultySummary.map(f => f.faculty_name);
+        const values = facultySummary.map(f => f.department_workload_hours);
+
+        if (workloadChartInstance) {
+            workloadChartInstance.destroy();
+        }
+
+        workloadChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: `${domain.label} (hours)`,
+                    data: values,
+                    backgroundColor: domain.bg,
+                    borderColor: domain.border,
+                    borderWidth: 1.5,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#fff', font: { weight: '600' } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ` ${context.dataset.label}: ${context.raw} hrs`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Hours per Semester', color: '#a5b4fc' },
+                        ticks: { color: '#fff' },
+                        grid: { color: 'rgba(255,255,255,0.08)' }
+                    },
+                    x: {
+                        ticks: { color: '#fff' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderHodDeptTable(data) {
+        const tbody = document.getElementById('hodDeptWorkloadTableBody');
+        const totalEl = document.getElementById('hodDeptTotalHours');
+        const avgEl = document.getElementById('hodDeptAvgHours');
+
+        if (totalEl) totalEl.textContent = `${data.department_total_hours.toFixed(2)} hrs`;
+        if (avgEl) avgEl.textContent = `${data.department_average_hours.toFixed(2)} hrs`;
+
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (!data.faculty_summary || data.faculty_summary.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:var(--text-light);">No faculty data available.</td></tr>`;
+            return;
+        }
+
+        data.faculty_summary.forEach(f => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid #e2e8f0';
+
+            let interpBadge = '';
+            if (f.interpretation === 'Above department average') {
+                interpBadge = `<span style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.82rem;">Above department average</span>`;
+            } else if (f.interpretation === 'Below department average') {
+                interpBadge = `<span style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.82rem;">Below department average</span>`;
+            } else {
+                interpBadge = `<span style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 4px 10px; border-radius: 6px; font-size: 0.82rem; font-weight: 600;">No data entered</span>`;
+            }
+
+            tr.innerHTML = `
+                <td style="padding: 12px 10px; font-weight: 700; color: #4338ca; font-family: monospace;">${f.custom_id}</td>
+                <td style="padding: 12px 10px; font-weight: 600; color: #0f172a;">${f.faculty_name}</td>
+                <td style="padding: 12px 10px;">
+                    <span style="font-weight: 800; color: #047857; font-size: 1.1rem;">${f.department_workload_hours.toFixed(2)}</span>
+                </td>
+                <td style="padding: 12px 10px; font-weight: 700; color: #0f172a;">${f.number_of_tasks}</td>
+                <td style="padding: 12px 10px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-weight: 700; min-width: 45px; color: #0f172a;">${f.workload_share_pct.toFixed(1)}%</span>
+                        <div style="flex: 1; max-width: 80px; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                            <div style="width: ${Math.min(100, f.workload_share_pct)}%; height: 100%; background: #4338ca; border-radius: 4px;"></div>
+                        </div>
+                    </div>
+                </td>
+                <td style="padding: 12px 10px;">${interpBadge}</td>
+                <td style="padding: 12px 10px; text-align: center;">
+                    <button class="btn-primary" onclick="openHodFacultyBreakdown(${f.faculty_id})" style="padding: 6px 12px; font-size: 0.82rem; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-weight: 600;">
+                        <span class="material-symbols-outlined" style="font-size: 16px;">visibility</span>
+                        View Breakdown
+                    </button>
+                </td>
+            `;
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Modal breakdown for HOD
+    const hodBreakdownModal = document.getElementById('hodDeptBreakdownModal');
+    const closeHodBreakdownModal = document.getElementById('closeHodDeptBreakdownModal');
+
+    if (closeHodBreakdownModal) {
+        closeHodBreakdownModal.addEventListener('click', () => {
+            if (hodBreakdownModal) {
+                hodBreakdownModal.style.display = 'none';
+                hodBreakdownModal.classList.remove('active');
+            }
+        });
+    }
+
+    window.openHodFacultyBreakdown = function(facultyId) {
+        if (!hodDeptSummaryData || !hodDeptSummaryData.faculty_summary) return;
+        const faculty = hodDeptSummaryData.faculty_summary.find(f => f.faculty_id == facultyId);
+        if (!faculty) return;
+
+        document.getElementById('hodModalFacultyName').textContent = `${faculty.faculty_name} (${faculty.custom_id})`;
+        document.getElementById('hodModalFacultySummary').textContent = 
+            `Total Department Workload: ${faculty.department_workload_hours.toFixed(2)} hrs across ${faculty.number_of_tasks} assigned tasks (${faculty.workload_share_pct}% of department total).`;
+
+        const tbody = document.getElementById('hodModalTasksBody');
+        tbody.innerHTML = '';
+
+        if (!faculty.tasks || faculty.tasks.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding: 24px; color: var(--text-light);">No tasks allocated for this faculty member.</td></tr>`;
+        } else {
+            faculty.tasks.forEach(t => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #e2e8f0';
+                tr.innerHTML = `
+                    <td style="padding: 10px; font-family: monospace; color: #4338ca; font-weight: 700;">${t.task_id}</td>
+                    <td style="padding: 10px;">
+                        <span style="background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 3px 8px; border-radius: 4px; font-size: 0.82rem; font-weight: 600;">${t.role_name}</span>
+                    </td>
+                    <td style="padding: 10px; font-weight: 600; color: #0f172a;">${t.task_name}</td>
+                    <td style="padding: 10px; font-weight: 700; color: #0284c7;">${t.quantity} ${t.work_unit}</td>
+                    <td style="padding: 10px; color: #475569; font-weight: 500;">${t.std_effort} hrs</td>
+                    <td style="padding: 10px; color: #0f172a; font-weight: 500;">${t.occurrences}</td>
+                    <td style="padding: 10px; color: #0f172a; font-weight: 500;">${t.complexity_factor}</td>
+                    <td style="padding: 10px;">
+                        <span style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 4px 8px; border-radius: 6px; font-weight: 700;">
+                            ${t.calculated_workload.toFixed(2)} hrs
+                        </span>
+                    </td>
+                    <td style="padding: 10px; color: #475569; font-size: 0.85rem;">${t.remarks || '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        if (hodBreakdownModal) {
+            hodBreakdownModal.style.display = 'flex';
+            hodBreakdownModal.classList.add('active');
+        }
     };
 
     // --- Init ---
