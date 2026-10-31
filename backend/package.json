@@ -6,8 +6,11 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "seed": "node seed.js"
-},
+    "seed": "node seed_all.js",
+    "seed:all": "node seed_all.js",
+    "clear": "node clear_all.js",
+    "clear:all": "node clear_all.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",

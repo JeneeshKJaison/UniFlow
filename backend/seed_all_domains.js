@@ -18,6 +18,13 @@ async function seedAllDomainsAndCurriculum() {
             ALTER TABLE department_tasks_master ALTER COLUMN role_id TYPE VARCHAR(50);
             ALTER TABLE department_tasks_master DROP CONSTRAINT IF EXISTS department_tasks_master_role_id_fkey;
             ALTER TABLE department_tasks_master ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'Department';
+
+            -- Ensure unique constraint on (faculty_id, task_id) for ON CONFLICT queries
+            DELETE FROM faculty_department_workload a USING faculty_department_workload b
+            WHERE a.id < b.id AND a.faculty_id = b.faculty_id AND a.task_id = b.task_id;
+
+            ALTER TABLE faculty_department_workload DROP CONSTRAINT IF EXISTS uq_faculty_task;
+            ALTER TABLE faculty_department_workload ADD CONSTRAINT uq_faculty_task UNIQUE (faculty_id, task_id);
         `);
         console.log('✓ Constraints updated & category columns ready.');
 
