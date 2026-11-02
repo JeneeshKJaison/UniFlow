@@ -170,7 +170,7 @@ The inventory below is rebuilt strictly from verified routes, controller functio
 #### `TC-ENG-B-01`: Student Assignment Collision Detection with Alternative Dates
 - **Endpoint:** `POST /api/faculty/student-assignments/check`
 - **Headers:** `Authorization: Bearer <FACULTY_TOKEN>`
-- **Preconditions:** Assignment with difficulty 8 already exists for B.Tech CSE Sem 5 on `2026-11-10`.
+- **Preconditions:** Assignments totaling 12 difficulty points already exist for B.Tech CSE Sem 5 on `2026-11-10`.
 - **Request Body:**
   ```json
   {
@@ -195,18 +195,16 @@ The inventory below is rebuilt strictly from verified routes, controller functio
     },
     "workload": {
       "date": "2026-11-10",
-      "current_daily_workload": 8,
+      "current_daily_workload": 12,
       "task_difficulty": 5,
-      "resulting_daily_workload": 13,
-      "daily_threshold": 10,
-      "weekly_workload_window": 13,
+      "resulting_daily_workload": 17,
+      "daily_threshold": 15,
+      "current_weekly_workload": 12,
+      "resulting_weekly_workload": 17,
       "weekly_threshold": 18
     },
     "alternative_dates": [
-      { "date": "2026-11-11", "current_workload": 0, "resulting_workload": 5, "threshold": 10 },
-      { "date": "2026-11-12", "current_workload": 0, "resulting_workload": 5, "threshold": 10 },
-      { "date": "2026-11-13", "current_workload": 0, "resulting_workload": 5, "threshold": 10 },
-      { "date": "2026-11-14", "current_workload": 0, "resulting_workload": 5, "threshold": 10 }
+      { "date": "2026-11-11", "current_workload": 0, "resulting_workload": 5, "threshold": 15, "current_weekly_workload": 12, "resulting_weekly_workload": 17, "weekly_threshold": 18 }
     ]
   }
   ```
@@ -361,9 +359,8 @@ Benchmark POST /api/faculty/student-assignments/check:
 
 | Limitation ID | Category | Description | Severity | Impact |
 | :--- | :--- | :--- | :--- | :--- |
-| **LIM-01** | **Authorization** | **Lack of Role Enforcement:** No server-side middleware validates whether `req.user.role === 'hod'`. | **High** | Students and faculty can invoke HOD assignment and suggest endpoints directly via API. |
+| **LIM-01** | **Authorization** | **Incomplete Role Enforcement:** Existing workload/HOD endpoints still lack role checks; the new grievance routes enforce student, faculty, and HOD roles. | **High** | Students and faculty may still invoke legacy HOD workload endpoints directly via API. |
 | **LIM-02** | **Concurrency** | **Check-Then-Insert Race in `assignTask`:** Workload check and task insertion are not wrapped in an isolated transaction or locking construct. | **Medium** | Concurrent rapid task assignments can exceed the 15-point threshold. |
 | **LIM-03** | **Storage** | **Deliverables Not Implemented:** Deliverable file submission documented in handoffs does not exist. | **Medium** | Faculty cannot upload completion files; tasks can only be toggled to completed. |
-| **LIM-04** | **Data Integrity** | **Alternative Dates Weekly Blindspot:** Alternative date search in `checkStudentWorkload` evaluates only the daily limit ($\le 10$), ignoring the weekly limit ($\le 18$). | **Low** | An alternative date suggested by the engine could still collide with a heavy weekly load. |
 | **LIM-05** | **Storage** | **Plaintext Tokens in `localStorage`:** JWT tokens and user objects are stored in browser `localStorage`, exposing them to cross-site scripting (XSS) extraction. | **Medium** | Standard web application vulnerability; should migrate to HttpOnly secure cookies. |
-| **LIM-06** | **Unconnected Screens** | **Timetable, Grievances, Chat & Admin Screens:** Several UI modules rely entirely on mock arrays in `localStorage` without backend persistence. | **Low** | Student performance, timetable scheduling, and admin user registration are isolated to the local browser session. |
+| **LIM-06** | **Unconnected Screens** | **Timetable, Chat & Admin Screens:** These UI modules still rely on mock arrays or browser-local state without backend persistence. Student grievances now use the database-backed workflow. | **Low** | Timetable scheduling, chat, and admin user registration remain isolated to the local browser session. |

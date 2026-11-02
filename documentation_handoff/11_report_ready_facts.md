@@ -13,10 +13,10 @@ This reference table contains every quantitative metric, threshold, algorithm co
 
 | Metric / Parameter | Value | Unit / Context | Source Code Citation | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Active Relational Tables** | **18** | Tables in `backend/schema.sql` | `backend/schema.sql:1-250` | **VERIFIED** |
-| **Total Database Tables** | **27** | Physical tables in public schema | Query of `information_schema.tables` (`scratch/check_db.js`) | **VERIFIED** |
+| **Active Relational Tables** | **19** | Tables in `backend/schema.sql` | `backend/schema.sql` | **VERIFIED** |
+| **Total Database Tables** | **28** | Physical tables after grievance migration (9 legacy tables remain) | Query of `information_schema.tables` | **VERIFIED** |
 | **Leftover Prototype Tables** | **9** | Unconnected tables (0 rows) | `attendance`, `grievances`, `marks`, `chat_*`, `timetable_*` | **VERIFIED** |
-| **Registered API Routes** | **26** | Total registered Express endpoints | `server.js`, `authRoutes`, `workloadRoutes`, `facultyRoutes`, `studentRoutes` | **VERIFIED** |
+| **Registered API Routes** | **33** | Total registered Express endpoints including seven grievance routes | `server.js` and route files | **VERIFIED** |
 | **Frontend HTML Documents** | **5** | HTML pages | `UI/index.html`, `UI/*/dashboard.html` | **VERIFIED** |
 | **Frontend Script Files** | **6** | JavaScript files in `UI/` | `login.js`, `login.backup.js`, `hod.js`, `faculty.js`, `student.js`, `admin.js` | **VERIFIED** |
 | **Frontend Stylesheets** | **5** | CSS files in `UI/` | `theme.css`, `login.css`, `hod.css`, `student.css`, `admin.css` | **VERIFIED** |
@@ -27,7 +27,7 @@ This reference table contains every quantitative metric, threshold, algorithm co
 | **Frontend CSS Lines** | **1,282** | Lines (Stylesheets) | `node scratch/count_loc.js` | **VERIFIED** |
 | **Total Codebase Lines of Code**| **14,514** | Lines across all layers | `node scratch/count_loc.js` | **VERIFIED** |
 | **HOD Workload Limit (Engine A)**| **15** | Maximum points active load | `backend/src/controllers/workloadController.js:25` (`WORKLOAD_THRESHOLD = 15`) | **VERIFIED** |
-| **Daily Student Limit (Engine B)**| **10** | Maximum points / day / class | `backend/src/controllers/facultyController.js:4` (`MAX_DAILY_STUDENT_WORKLOAD = 10`) | **VERIFIED** |
+| **Daily Student Limit (Engine B)**| **15** | Maximum points / day / class | `backend/src/controllers/facultyController.js` (`MAX_DAILY_STUDENT_WORKLOAD = 15`) | **VERIFIED** |
 | **Weekly Student Limit (Engine B)**| **18** | Maximum points / 7-day window | `backend/src/controllers/facultyController.js:5` (`MAX_WEEKLY_STUDENT_WORKLOAD = 18`) | **VERIFIED** |
 | **Weekly Collision Window** | **7** | Rolling days (`due_date ± 3d`) | `backend/src/controllers/facultyController.js:246` (`INTERVAL '3 days'`) | **VERIFIED** |
 | **Student Workload Gauge Max** | **20** | Points (visual gauge scale) | `backend/src/controllers/studentController.js:63` (`gaugeMax = 20`) | **VERIFIED** |

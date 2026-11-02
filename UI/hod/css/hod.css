@@ -1,5 +1,36 @@
 /* HOD Specific Styles */
 
+.workload-table-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.workload-table-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--primary-color);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--primary-color);
+    cursor: pointer;
+}
+
+.workload-table-toggle:hover,
+.workload-table-toggle:focus-visible {
+    background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+}
+
+.workload-table-toggle:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
 /* Workload Bars */
 .workload-list {
     display: flex;
@@ -203,14 +234,67 @@
 }
 
 .calendar-day.has-tasks {
-    background: var(--primary-color);
-    color: white;
-    border: none;
+    color: #0f172a;
+    border-color: transparent;
 }
 
-.calendar-day.has-tasks.urgent {
-    background: #e53e3e;
-    color: white;
+.calendar-day.workload-low {
+    background: #bbf7d0;
+}
+
+.calendar-day.workload-medium {
+    background: #fde68a;
+}
+
+.calendar-day.workload-high {
+    background: #fdba74;
+}
+
+.calendar-day.workload-overloaded {
+    background: #fca5a5;
+}
+
+.calendar-workload-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    margin-top: 14px;
+    color: var(--text-light);
+    font-size: 0.8rem;
+}
+
+.calendar-workload-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.calendar-legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+.calendar-legend-swatch.workload-low {
+    background: #bbf7d0;
+}
+
+.calendar-legend-swatch.workload-medium {
+    background: #fde68a;
+}
+
+.calendar-legend-swatch.workload-high {
+    background: #fdba74;
+}
+
+.calendar-legend-swatch.workload-overloaded {
+    background: #fca5a5;
+}
+
+.calendar-day.has-tasks.workload-overloaded .day-number {
+    font-weight: 800;
 }
 
 .calendar-day.selected {

@@ -295,8 +295,9 @@ Every endpoint documented below is actively registered in Express route files an
   }
   ```
 - **Collision Rules:**
-  - Daily limit: `dailyTotal + difficulty > 10`
+  - Daily limit: `dailyTotal + difficulty > 15`
   - Weekly limit: `weeklyTotal + difficulty > 18` (across rolling window `due_date ± 3 days`)
+  - Suggested dates must meet both limits.
 - **Collision Response (HTTP 200 OK):**
   ```json
   {
@@ -312,11 +313,12 @@ Every endpoint documented below is actively registered in Express route files an
     },
     "workload": {
       "date": "2026-11-10",
-      "current_daily_workload": 8,
+      "current_daily_workload": 12,
       "task_difficulty": 5,
-      "resulting_daily_workload": 13,
-      "daily_threshold": 10,
-      "weekly_workload_window": 13,
+      "resulting_daily_workload": 17,
+      "daily_threshold": 15,
+      "current_weekly_workload": 12,
+      "resulting_weekly_workload": 17,
       "weekly_threshold": 18
     },
     "alternative_dates": [
@@ -324,7 +326,10 @@ Every endpoint documented below is actively registered in Express route files an
         "date": "2026-11-11",
         "current_workload": 0,
         "resulting_workload": 5,
-        "threshold": 10
+        "threshold": 15,
+        "current_weekly_workload": 12,
+        "resulting_weekly_workload": 17,
+        "weekly_threshold": 18
       }
     ]
   }
@@ -342,12 +347,11 @@ Every endpoint documented below is actively registered in Express route files an
     "description": "Implement Round Robin and Priority scheduling in C++",
     "difficulty": 4,
     "due_date": "2026-11-15",
-    "max_marks": 100,
-    "override_collision": false
+    "max_marks": 100
   }
   ```
 - **Database Operations (Transactional `BEGIN` / `COMMIT`):**
-  1. Re-evaluates daily and weekly collision. If overloaded and `override_collision !== true`, rejects with HTTP 409 Conflict.
+  1. Acquires a class/semester transaction lock and re-evaluates daily and weekly workload. If overloaded, rejects with HTTP 409 Conflict and returns safe alternative dates.
   2. Inserts assignment record into `student_assignments`.
   3. Automatically fans out rows to `student_assignment_submissions` with `status = 'pending'` for all enrolled students in that course and semester.
 - **Success Response (HTTP 201 Created):**
@@ -417,7 +421,7 @@ Every endpoint documented below is actively registered in Express route files an
 
 ## 3. Unregistered Routes Claimed in Earlier Documentation
 
-The following endpoints were claimed to exist in earlier unverified documentation handoffs (`00`–`08`) but are **NOT REGISTERED** in any Express router and have no implementation in the codebase:
+The following endpoints were claimed to exist in earlier unverified documentation handoffs (`00`–`08`) but remain **NOT REGISTERED** in any Express router:
 
 | Claimed Endpoint | Method | Claimed Purpose | Reality in Source Code |
 | :--- | :---: | :--- | :--- |
@@ -427,9 +431,27 @@ The following endpoints were claimed to exist in earlier unverified documentatio
 | `/api/admin/departments` | `POST` | Admin department creation | **NOT REGISTERED.** Admin operates in `localStorage`. |
 | `/api/admin/courses` | `POST` | Admin course creation | **NOT REGISTERED.** Admin operates in `localStorage`. |
 | `/api/admin/hod/assign` | `POST` | Admin HOD credential assignment | **NOT REGISTERED.** Handled via client-side `localStorage`. |
-| `/api/grievances` | `GET/POST` | Grievance lodging & tracking | **NOT REGISTERED.** Handled via mock array in `hod.js` / `faculty.js`. |
-| `/api/grievances/:id` | `PATCH` | HOD sends resolution remarks | **NOT REGISTERED.** Mutates client-side object in `hod.js:1263`. |
 | `/api/timetable` | `GET/POST` | Timetable grid load and updates | **NOT REGISTERED.** Stored in browser `localStorage`. |
 | `/api/chat/threads` | `GET/POST` | Department messaging threads | **NOT REGISTERED.** Uses hardcoded static messages in `hod.js`. |
 | `/api/student/performance` | `GET` | Marks & GPA trend data | **NOT REGISTERED.** Hardcoded sample stats in `student.js`. |
 | `/api/student/attendance` | `GET` | Subject-wise attendance percentages | **NOT REGISTERED.** Hardcoded in `student.js:loadCourses`. |
+
+### Student grievance workflow (registered)
+
+All grievance endpoints require a valid JWT and enforce the caller's role server-side. Students may select a faculty member in their department, and both parties must confirm resolution. When marking resolved, the faculty member or HOD may provide an optional resolution comment (up to 2,000 characters), which is shown to the other party. Unresolved student grievances are automatically routed to the department HOD after the seven-day deadline. Faculty may also file grievances with an HOD assigned to one of their departments; the HOD marks resolution and the filing faculty member confirms it.
+
+| Method | Endpoint | Required role | Purpose |
+| :---: | :--- | :--- | :--- |
+| `GET` | `/api/grievances/faculty-options` | Student | List faculty eligible to receive a grievance in the student's department. |
+| `GET` | `/api/grievances/student` | Student | List the caller's grievances and confirmation/deadline state. |
+| `POST` | `/api/grievances` | Student | File a grievance addressed to a selected faculty member. |
+| `PATCH` | `/api/grievances/:id/faculty-resolved` | Faculty | Mark the assigned grievance resolved, optionally including `resolution_comment`. |
+| `PATCH` | `/api/grievances/:id/student-resolved` | Student | Confirm resolution after the faculty member has marked it resolved. |
+| `GET` | `/api/grievances/faculty` | Faculty | List grievances assigned to the caller. |
+| `GET` | `/api/grievances/hod/escalated` | HOD | List unresolved grievances escalated to the caller. |
+| `GET` | `/api/grievances/faculty/hod-departments` | Faculty | List the caller's departments and their assigned HODs. |
+| `GET` | `/api/grievances/faculty/hod` | Faculty | List grievances the caller filed with their HODs. |
+| `POST` | `/api/grievances/faculty/hod` | Faculty | File a grievance with an HOD in a department where the caller is a member. |
+| `PATCH` | `/api/grievances/:id/hod-resolved` | HOD | Mark a faculty-filed grievance resolved, optionally including `resolution_comment`. |
+| `PATCH` | `/api/grievances/:id/faculty-confirmed` | Faculty | Confirm HOD resolution and close the faculty-filed grievance. |
+| `GET` | `/api/grievances/hod/faculty-grievances` | HOD | List unresolved faculty grievances filed with the caller. |

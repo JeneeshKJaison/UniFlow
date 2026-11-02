@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const API_URL = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin.includes(':5000')) ? window.location.origin : 'http://localhost:5000';
 
-    // --- Mock Data Store & Dynamic Logged-in Faculty Context ---
+    // --- Dynamic Logged-in Faculty Context ---
     let currentFaculty = { id: 2, customId: 'FAC001', name: 'Grace Hopper', email: 'faculty@uniflow.edu', deptId: 1, deptName: 'Computer Science' };
     const storedUser = localStorage.getItem('uniflow_currentUser');
     if (storedUser) {
@@ -59,10 +59,6 @@ document.addEventListener('DOMContentLoaded', () => {
         studentTasks: [
             { id: 101, classId: 2, desc: 'Complete OS assignment chapter 1', deadline: '2026-07-20' },
             { id: 102, classId: 1, desc: 'Write a basic Linked List program', deadline: '2026-07-22' }
-        ],
-        // Grievances submitted by this faculty
-        grievances: [
-            { id: 1, subject: 'Projector broken in Lab 3', details: 'The overhead projector in Lab 3 is completely unresponsive.', date: '2026-07-09', status: 'Pending', resolution: '' }
         ],
         studentMarks: [
             // { studentId, subjectId, assignmentScore, examScore }
@@ -165,7 +161,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Refresh data once token acquired
                 fetchFacultyTasks();
                 fetchFacultySubjects();
-                fetchFacultyDeptOverviewStat();
                 renderFacultyDepartmentWorkload();
             }
         }).catch(() => {});
@@ -229,9 +224,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeTasks = dataStore.facultyTasks.filter(t => !t.status || t.status.toLowerCase() !== 'completed');
         document.getElementById('statTasks').textContent = activeTasks.length;
 
-        // Fetch department workload total for overview stat
-        fetchFacultyDeptOverviewStat();
-
         const tbody = document.getElementById('facultyTasksList');
         if (!tbody) return;
         tbody.innerHTML = '';
@@ -248,7 +240,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         dataStore.facultyTasks.forEach(task => {
-            const diff = parseInt(task.difficulty) || 1;
+            const workloadPoints = Number(task.workload_points ?? task.estimated_hours ?? task.difficulty ?? 0);
+            const diff = workloadPoints;
             let diffColor = '#48bb78';
             if (diff > 4) diffColor = '#ecc94b';
             if (diff > 7) diffColor = '#f56565';
@@ -265,7 +258,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const targetDate = task.deadline ? parseDate(task.deadline) : (task.scheduled_date ? parseDate(task.scheduled_date) : null);
             const dateDisplay = targetDate ? targetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Flexible';
-            const subjectLabel = task.subject_name ? `<div style="font-size: 0.8rem; color: var(--text-light); margin-top: 2px;">Subject: ${task.subject_name}</div>` : '';
+            const categoryLabel = task.category_name || task.subject_name || 'General work';
+            const subjectLabel = `<div style="font-size: 0.8rem; color: var(--text-light); margin-top: 2px;">${categoryLabel}${task.estimated_hours ? ` · ${task.estimated_hours} hours (${workloadPoints} workload points)` : ` · ${workloadPoints} legacy workload points`}</div>`;
             const creatorLabel = task.creator_name ? `<div style="font-size: 0.75rem; color: var(--primary-color);">By ${task.creator_name}</div>` : '';
 
             let actionButtons = '';
@@ -289,7 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${subjectLabel}
                         ${creatorLabel}
                     </td>
-                    <td><span style="background: ${diffColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">Level ${diff}</span></td>
+                    <td><span style="background: ${diffColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">${diff} points</span></td>
                     <td>${dateDisplay}</td>
                     <td>${statusBadge}</td>
                     <td>${actionButtons}</td>
@@ -373,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (dayTasks.length > 0) {
                 classStr += ' has-tasks';
-                if (dayTasks.some(t => parseInt(t.difficulty) > 7)) {
+                if (dayTasks.some(t => Number(t.workload_points ?? t.estimated_hours ?? t.difficulty ?? 0) > 7)) {
                     classStr += ' urgent';
                 }
             }
@@ -429,8 +423,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span style="font-size: 0.8rem; padding: 2px 8px; border-radius: 10px; background: rgba(255,255,255,0.1);">${t.status || 'Pending'}</span>
                         </div>
                         <div style="color:var(--text-light); font-size: 0.9rem; margin-top: 4px;">
-                            <span>Subject: ${t.subject_name || 'General'}</span> &bull; 
-                            <span>Difficulty: ${t.difficulty}/10</span> &bull; 
+                            <span>${t.category_name || t.subject_name || 'General work'}</span> &bull;
+                            <span>${t.estimated_hours ? `${t.estimated_hours} hours` : `${t.workload_points ?? t.difficulty} workload points`}</span> &bull;
                             <span>By: ${t.creator_name || 'HOD'}</span>
                         </div>
                     </div>
@@ -640,8 +634,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- 6. Task Assignment (To Students) ---
-    let pendingStudentTaskPayload = null;
-
     async function fetchAssignedStudentWorks() {
         if (!authToken) return;
         try {
@@ -752,21 +744,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('assignWorkForm').reset();
                 closeWorkloadModal();
                 fetchAssignedStudentWorks();
+            } else if (res.status === 409 && data.alternative_dates) {
+                showStudentWorkloadRecommendations(data, payload);
             } else {
-                alert(`❌ ${data.message || 'Failed to assign work.'}`);
+                alert(`❌ ${data.message || 'Failed to assign work.'}${res.status === 409 ? ' Please validate again for current alternative dates.' : ''}`);
             }
         } catch (err) {
-            console.warn('Network error while assigning work, saving locally:', err);
-            dataStore.studentTasks.push({
-                id: Date.now(),
-                classId: payload.subject_id,
-                desc: payload.title + ' - ' + payload.description,
-                deadline: payload.due_date
-            });
-            alert('✅ Assignment published successfully!');
-            document.getElementById('assignWorkForm').reset();
-            closeWorkloadModal();
-            fetchAssignedStudentWorks();
+            console.error('Error while assigning student work:', err);
+            alert('Could not save the assignment. Check your connection and try again.');
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -778,16 +763,65 @@ document.addEventListener('DOMContentLoaded', () => {
     function closeWorkloadModal() {
         const modal = document.getElementById('studentWorkloadModal');
         if (modal) modal.style.display = 'none';
-        pendingStudentTaskPayload = null;
+    }
+
+    function showStudentWorkloadRecommendations(checkData, payload) {
+        const modal = document.getElementById('studentWorkloadModal');
+        const notice = document.getElementById('modalClassNotice');
+        const summary = document.getElementById('modalWorkloadSummary');
+        const colliding = document.getElementById('modalCollidingAssignments');
+        const altList = document.getElementById('modalAlternativeDatesList');
+        const workload = checkData.workload;
+
+        notice.textContent = checkData.target_class
+            ? `${checkData.target_class.course_name} (Sem ${checkData.target_class.semester})`
+            : document.getElementById('workClassSelect').selectedOptions[0]?.textContent || 'Selected class';
+        summary.innerHTML = `
+            Target Date: <strong>${payload.due_date}</strong><br>
+            Current Class Workload: <strong>${workload.current_daily_workload} pts</strong> + Task: <strong>${workload.task_difficulty ?? payload.difficulty} pts</strong> =
+            <strong style="color:#e53e3e;">${workload.resulting_daily_workload} pts</strong> (Daily limit: ${workload.daily_threshold} pts).<br>
+            Weekly workload: <strong>${workload.resulting_weekly_workload} / ${workload.weekly_threshold} pts</strong>.<br>
+            <em>${checkData.reason || checkData.message || 'Workload limit exceeded.'}</em>
+        `;
+
+        const existingAssignments = checkData.existing_assignments || [];
+        colliding.innerHTML = existingAssignments.length
+            ? '<strong>Existing assignments due on this date:</strong><ul style="margin: 4px 0 0 16px;">' +
+                existingAssignments.map(assignment => `<li>${assignment.subject_code} - ${assignment.title} (Level ${assignment.difficulty})</li>`).join('') +
+                '</ul>'
+            : '';
+
+        altList.innerHTML = '';
+        if (checkData.alternative_dates?.length) {
+            checkData.alternative_dates.forEach(alternative => {
+                const item = document.createElement('div');
+                item.className = 'glass-card';
+                item.style.cssText = 'padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border: 1px solid rgba(72, 187, 120, 0.4); background: rgba(72, 187, 120, 0.08); border-radius: 8px; transition: all 0.2s;';
+                item.innerHTML = `
+                    <div>
+                        <strong style="color: #48bb78; font-size: 1rem;">📅 ${alternative.formatted_date}</strong>
+                        <div style="font-size: 0.85rem; color: var(--text-light); margin-top: 2px;">
+                            Daily: ${alternative.current_workload} pts → <strong>${alternative.resulting_workload} / ${alternative.threshold} pts</strong> ·
+                            Weekly: <strong>${alternative.resulting_weekly_workload} / ${alternative.weekly_threshold} pts</strong>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-primary" style="padding: 6px 14px; font-size: 0.85rem;">Select & Assign</button>
+                `;
+                item.addEventListener('click', () => {
+                    payload.due_date = alternative.date;
+                    document.getElementById('workDeadline').value = alternative.date;
+                    executeSaveStudentAssignment(payload);
+                });
+                altList.appendChild(item);
+            });
+        } else {
+            altList.innerHTML = '<p style="color: var(--text-light);">No safe dates found in the next 14 days. Change the due date and validate again.</p>';
+        }
+
+        modal.style.display = 'flex';
     }
 
     document.getElementById('btnCancelAssignment')?.addEventListener('click', closeWorkloadModal);
-
-    document.getElementById('btnOverrideAssignment')?.addEventListener('click', () => {
-        if (pendingStudentTaskPayload) {
-            executeSaveStudentAssignment(pendingStudentTaskPayload);
-        }
-    });
 
     document.getElementById('assignWorkForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -829,7 +863,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const checkData = await checkRes.json();
 
-            if (!checkData.success) {
+            if (!checkRes.ok || !checkData.success) {
                 alert(checkData.message || 'Workload validation failed.');
                 return;
             }
@@ -840,64 +874,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // 3. If OVERLOAD / COLLISION DETECTED -> Open Smart Recommendation Modal
-            pendingStudentTaskPayload = payload;
-            const modal = document.getElementById('studentWorkloadModal');
-            const notice = document.getElementById('modalClassNotice');
-            const summary = document.getElementById('modalWorkloadSummary');
-            const colliding = document.getElementById('modalCollidingAssignments');
-            const altList = document.getElementById('modalAlternativeDatesList');
-
-            notice.textContent = `${checkData.target_class.course_name} (Sem ${checkData.target_class.semester})`;
-
-            summary.innerHTML = `
-                Target Date: <strong>${payload.due_date}</strong><br>
-                Current Class Workload: <strong>${checkData.workload.current_daily_workload} pts</strong> + Task: <strong>${payload.difficulty} pts</strong> = 
-                <strong style="color:#e53e3e;">${checkData.workload.resulting_daily_workload} pts</strong> (Max Safe Limit: ${checkData.workload.daily_threshold} pts).<br>
-                <em>${checkData.reason || 'High workload concentration on this date.'}</em>
-            `;
-
-            if (checkData.existing_assignments && checkData.existing_assignments.length > 0) {
-                colliding.innerHTML = '<strong>Existing assignments due on this date:</strong><ul style="margin: 4px 0 0 16px;">' +
-                    checkData.existing_assignments.map(a => `<li>${a.subject_code} - ${a.title} (Level ${a.difficulty})</li>`).join('') + '</ul>';
-            } else {
-                colliding.innerHTML = '';
-            }
-
-            altList.innerHTML = '';
-            if (checkData.alternative_dates && checkData.alternative_dates.length > 0) {
-                checkData.alternative_dates.forEach(alt => {
-                    const item = document.createElement('div');
-                    item.className = 'glass-card';
-                    item.style.cssText = 'padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border: 1px solid rgba(72, 187, 120, 0.4); background: rgba(72, 187, 120, 0.08); border-radius: 8px; transition: all 0.2s;';
-                    item.innerHTML = `
-                        <div>
-                            <strong style="color: #48bb78; font-size: 1rem;">📅 ${alt.formatted_date}</strong>
-                            <div style="font-size: 0.85rem; color: var(--text-light); margin-top: 2px;">
-                                Workload: ${alt.current_workload} pts $\\rightarrow$ <strong>${alt.resulting_workload} / ${alt.threshold} pts</strong> (Safe)
-                            </div>
-                        </div>
-                        <button type="button" class="btn-primary" style="padding: 6px 14px; font-size: 0.85rem;">Select & Assign</button>
-                    `;
-                    item.addEventListener('click', () => {
-                        payload.due_date = alt.date;
-                        document.getElementById('workDeadline').value = alt.date;
-                        executeSaveStudentAssignment(payload);
-                    });
-                    altList.appendChild(item);
-                });
-            } else {
-                altList.innerHTML = '<p style="color: var(--text-light);">No safe dates found in the next 14 days. You may choose to override.</p>';
-            }
-
-            modal.style.display = 'flex';
+            showStudentWorkloadRecommendations(checkData, payload);
 
         } catch (err) {
             console.error('Workload check error:', err);
-            // Fallback: allow saving if check API fails
-            if (confirm('Workload verification server did not respond. Do you want to force assign this work?')) {
-                await executeSaveStudentAssignment(payload);
-            }
+            alert('Could not verify student workload. The assignment was not saved; check your connection and try again.');
         }
     });
 
@@ -978,86 +959,280 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('Marks saved successfully!');
     });
 
-    // --- 8. Grievances ---
-    function renderGrievances() {
-        const tbody = document.getElementById('myGrievanceList');
-        if (!tbody) return;
-        tbody.innerHTML = '';
+    // --- 8. Student Grievances ---
+    let facultyGrievances = [];
+    let activeFacultyGrievance = null;
 
-        dataStore.grievances.forEach(g => {
-            let statColor = '#dd6b20'; // Pending
-            if (g.status === 'Resolved') statColor = '#48bb78';
-            else if (g.status === 'Remark Sent') statColor = '#3182ce';
-
-            tbody.innerHTML += `
-                <tr>
-                    <td>${g.date}</td>
-                    <td>${g.subject}</td>
-                    <td style="color:${statColor}; font-weight:500;">${g.status}</td>
-                    <td>
-                        <button class="btn-primary" style="padding: 4px 12px; font-size: 0.9rem;" onclick="viewMyGrievance(${g.id})">View Status</button>
-                    </td>
-                </tr>
-            `;
-        });
+    function escapeGrievanceHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, character => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        })[character]);
     }
 
-    document.getElementById('btnNewGrievance')?.addEventListener('click', () => {
-        document.getElementById('newGrievanceForm').reset();
-        document.getElementById('newGrievanceModal').classList.add('active');
-    });
+    let facultyHodDepartmentsLoaded = false;
 
-    document.getElementById('closeNewGrievanceModal')?.addEventListener('click', () => {
-        document.getElementById('newGrievanceModal').classList.remove('active');
-    });
-
-    document.getElementById('newGrievanceForm')?.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const sub = document.getElementById('grivSubject').value;
-        const det = document.getElementById('grivDetails').value;
-
-        dataStore.grievances.push({
-            id: Date.now(),
-            subject: sub,
-            details: det,
-            date: new Date().toISOString().split('T')[0],
-            status: 'Pending',
-            resolution: ''
-        });
-
-        alert('Grievance submitted successfully!');
-        document.getElementById('newGrievanceModal').classList.remove('active');
-        renderGrievances();
-    });
-
-    window.viewMyGrievance = function (id) {
-        const g = dataStore.grievances.find(x => x.id == id);
-        if (!g) return;
-
-        let resolutionHtml = '';
-        if (g.status !== 'Pending') {
-            resolutionHtml = `
-                <div style="margin-top: 16px; border-top: 1px solid var(--glass-border); padding-top: 16px;">
-                    <strong style="color: var(--primary-color);">HOD Remarks:</strong>
-                    <p style="padding:12px; background:rgba(0,0,0,0.1); border-radius:8px; margin-top:8px;">${g.resolution || 'No details provided.'}</p>
-                </div>
-            `;
+    async function loadFacultyHodDepartments() {
+        const select = document.getElementById('facultyGrievanceDepartment');
+        if (!select || facultyHodDepartmentsLoaded) return;
+        if (!authToken) {
+            select.innerHTML = '<option value="">Sign in to load your department HODs</option>';
+            return;
         }
 
+        try {
+            const response = await fetch(`${API_URL}/api/grievances/faculty/hod-departments`, {
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Failed to load your department HODs.');
+            }
+
+            select.innerHTML = '<option value="">Select a department and HOD</option>';
+            data.departments.forEach(department => {
+                const option = document.createElement('option');
+                option.value = department.id;
+                option.textContent = `${department.name} — ${department.hod_name}`;
+                select.appendChild(option);
+            });
+            if (data.departments.length === 0) {
+                select.innerHTML = '<option value="">No department HOD is assigned to you</option>';
+            }
+            facultyHodDepartmentsLoaded = true;
+        } catch (error) {
+            console.error('Load faculty grievance HODs error:', error);
+            select.innerHTML = '<option value="">Unable to load department HODs</option>';
+        }
+    }
+
+    async function renderFacultyHodGrievances() {
+        const tbody = document.getElementById('facultyHodGrievanceList');
+        if (!tbody) return;
+        if (!authToken) {
+            tbody.innerHTML = '<tr><td colspan="6">Sign in to view grievances filed with your HOD.</td></tr>';
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_URL}/api/grievances/faculty/hod`, {
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Failed to load your HOD grievances.');
+            }
+
+            if (data.grievances.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:16px;">You have not filed any grievances with your HOD.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.grievances.map(grievance => {
+                const status = grievance.resolved_at
+                    ? 'Resolved by both parties'
+                    : grievance.hod_resolved_at
+                        ? 'HOD marked resolved — awaiting your confirmation'
+                        : Date.parse(grievance.due_at) < Date.now()
+                            ? 'Overdue — awaiting HOD'
+                            : 'Awaiting HOD response';
+                const confirmAction = grievance.hod_resolved_at && !grievance.faculty_confirmed_at && !grievance.resolved_at
+                    ? `<button class="btn-primary" style="padding:4px 12px;" onclick="confirmFacultyHodGrievance(${grievance.id})">Confirm resolved</button>`
+                    : '';
+                return `
+                    <tr>
+                        <td>${escapeGrievanceHtml(new Date(grievance.created_at).toLocaleDateString())}</td>
+                        <td>${escapeGrievanceHtml(grievance.hod_name)}</td>
+                        <td><details><summary>${escapeGrievanceHtml(grievance.subject)}</summary><p>${escapeGrievanceHtml(grievance.details)}</p>${grievance.resolution_comment ? `<p><strong>HOD resolution comment:</strong> ${escapeGrievanceHtml(grievance.resolution_comment)}</p>` : ''}</details></td>
+                        <td>${escapeGrievanceHtml(new Date(grievance.due_at).toLocaleString())}</td>
+                        <td>${escapeGrievanceHtml(status)}</td>
+                        <td>${confirmAction}</td>
+                    </tr>
+                `;
+            }).join('');
+        } catch (error) {
+            console.error('Load faculty-to-HOD grievances error:', error);
+            tbody.innerHTML = `<tr><td colspan="6" role="alert">${escapeGrievanceHtml(error.message)}</td></tr>`;
+        }
+    }
+
+    async function renderGrievances() {
+        loadFacultyHodDepartments();
+        renderFacultyHodGrievances();
+
+        const tbody = document.getElementById('myGrievanceList');
+        if (!tbody) return;
+        if (!authToken) {
+            tbody.innerHTML = '<tr><td colspan="6">Sign in to view student grievances assigned to you.</td></tr>';
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_URL}/api/grievances/faculty`, {
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Failed to load student grievances.');
+            }
+
+            facultyGrievances = data.grievances;
+            if (facultyGrievances.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:16px;">No student grievances are assigned to you.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = facultyGrievances.map(grievance => {
+                const status = grievance.resolved_at
+                    ? 'Resolved by both parties'
+                    : grievance.status === 'escalated'
+                        ? 'Escalated to HOD'
+                        : grievance.faculty_resolved_at
+                            ? 'Awaiting student confirmation'
+                            : 'Needs your attention';
+                return `
+                    <tr>
+                        <td>${escapeGrievanceHtml(new Date(grievance.created_at).toLocaleDateString())}</td>
+                        <td>${escapeGrievanceHtml(grievance.student_name)}</td>
+                        <td>${escapeGrievanceHtml(grievance.subject)}</td>
+                        <td>${escapeGrievanceHtml(new Date(grievance.due_at).toLocaleString())}</td>
+                        <td>${escapeGrievanceHtml(status)}</td>
+                        <td><button class="btn-primary" style="padding:4px 12px;" onclick="viewMyGrievance(${grievance.id})">View</button></td>
+                    </tr>
+                `;
+            }).join('');
+        } catch (error) {
+            console.error('Load faculty grievances error:', error);
+            tbody.innerHTML = `<tr><td colspan="6" role="alert">${escapeGrievanceHtml(error.message)}</td></tr>`;
+        }
+    }
+
+    document.getElementById('facultyHodGrievanceForm')?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+
+        try {
+            const response = await fetch(`${API_URL}/api/grievances/faculty/hod`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + authToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    department_id: document.getElementById('facultyGrievanceDepartment').value,
+                    category: document.getElementById('facultyGrievanceCategory').value,
+                    subject: document.getElementById('facultyGrievanceSubject').value,
+                    details: document.getElementById('facultyGrievanceDetails').value
+                })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Could not file grievance with your HOD.');
+            }
+
+            form.reset();
+            await renderFacultyHodGrievances();
+            alert(data.message);
+        } catch (error) {
+            console.error('File faculty grievance to HOD error:', error);
+            alert(error.message);
+        } finally {
+            submitButton.disabled = false;
+        }
+    });
+
+    window.confirmFacultyHodGrievance = async function(grievanceId) {
+        try {
+            const response = await fetch(`${API_URL}/api/grievances/${grievanceId}/faculty-confirmed`, {
+                method: 'PATCH',
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Could not confirm grievance resolution.');
+            }
+            await renderFacultyHodGrievances();
+            alert(data.message);
+        } catch (error) {
+            console.error('Confirm faculty grievance resolution error:', error);
+            alert(error.message);
+        }
+    };
+
+    window.viewMyGrievance = function(id) {
+        const grievance = facultyGrievances.find(item => item.id === id);
+        if (!grievance) return;
+        activeFacultyGrievance = grievance;
+
+        const facultyStatus = grievance.faculty_resolved_at ? 'Marked resolved' : 'Not marked resolved';
+        const studentStatus = grievance.student_resolved_at ? 'Confirmed resolved' : 'Not confirmed';
         document.getElementById('viewGrievanceDetails').innerHTML = `
-            <strong>Date:</strong> ${g.date}<br>
-            <strong>Subject:</strong> ${g.subject}<br><br>
-            <strong>Details:</strong>
-            <p style="padding:12px; background:rgba(0,0,0,0.1); border-radius:8px;">${g.details}</p>
-            ${resolutionHtml}
+            <p><strong>Student:</strong> ${escapeGrievanceHtml(grievance.student_name)}</p>
+            <p><strong>Department:</strong> ${escapeGrievanceHtml(grievance.department_name)}</p>
+            <p><strong>Category:</strong> ${escapeGrievanceHtml(grievance.category)}</p>
+            <p><strong>Subject:</strong> ${escapeGrievanceHtml(grievance.subject)}</p>
+            <p><strong>Description:</strong></p>
+            <p style="white-space:pre-wrap; padding:12px; background:#f1f5f9; border-radius:8px;">${escapeGrievanceHtml(grievance.details)}</p>
+            <p><strong>Filed:</strong> ${escapeGrievanceHtml(new Date(grievance.created_at).toLocaleString())}</p>
+            <p><strong>7-day deadline:</strong> ${escapeGrievanceHtml(new Date(grievance.due_at).toLocaleString())}</p>
+            <p><strong>Faculty:</strong> ${facultyStatus} · <strong>Student:</strong> ${studentStatus}</p>
+            ${grievance.resolution_comment ? `<p><strong>Resolution comment:</strong></p><p style="white-space:pre-wrap; padding:12px; background:#f1f5f9; border-radius:8px;">${escapeGrievanceHtml(grievance.resolution_comment)}</p>` : ''}
+            ${grievance.status === 'escalated' ? '<p style="color:#b45309; font-weight:600;">This grievance has been escalated to your HOD.</p>' : ''}
         `;
 
+        const resolveButton = document.getElementById('facultyResolveGrievanceBtn');
+        resolveButton.hidden = Boolean(grievance.faculty_resolved_at || grievance.resolved_at);
+        document.getElementById('facultyResolutionCommentField').hidden = resolveButton.hidden;
+        document.getElementById('facultyResolutionComment').value = '';
         document.getElementById('viewGrievanceModal').classList.add('active');
     };
+
+    document.getElementById('facultyResolveGrievanceBtn')?.addEventListener('click', async () => {
+        if (!activeFacultyGrievance) return;
+        const resolveButton = document.getElementById('facultyResolveGrievanceBtn');
+        resolveButton.disabled = true;
+
+        try {
+            const response = await fetch(`${API_URL}/api/grievances/${activeFacultyGrievance.id}/faculty-resolved`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': 'Bearer ' + authToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    resolution_comment: document.getElementById('facultyResolutionComment').value
+                })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Could not mark grievance resolved.');
+            }
+
+            document.getElementById('viewGrievanceModal').classList.remove('active');
+            await renderGrievances();
+            alert(data.message);
+        } catch (error) {
+            console.error('Mark faculty grievance resolved error:', error);
+            alert(error.message);
+        } finally {
+            resolveButton.disabled = false;
+        }
+    });
 
     document.getElementById('closeViewGrievanceModal')?.addEventListener('click', () => {
         document.getElementById('viewGrievanceModal').classList.remove('active');
     });
+
+    window.setInterval(() => {
+        if (document.getElementById('grievances')?.classList.contains('active')) {
+            renderGrievances();
+        }
+    }, 60_000);
 
     // --- 9. Team Chat ---
     let currentChatThreadId = null;
@@ -1412,71 +1587,52 @@ document.addEventListener('DOMContentLoaded', () => {
             kpiTotalId: 'deptKpiTotalHours',
             kpiCountId: 'deptKpiTaskCount',
             badgeId: 'deptWorkloadTableCountBadge',
-            overviewId: 'ovDeptHours'
+            overviewId: 'ovDeptHours',
+            overviewCountId: 'ovDeptTasks'
         },
         Institutional: {
             tableId: 'facultyInstWorkloadList',
             kpiTotalId: 'instKpiTotalHours',
             kpiCountId: 'instKpiTaskCount',
             badgeId: 'instWorkloadTableCountBadge',
-            overviewId: 'ovInstHours'
+            overviewId: 'ovInstHours',
+            overviewCountId: 'ovInstTasks'
         },
         ExtraProactive: {
             tableId: 'facultyExtraWorkloadList',
             kpiTotalId: 'extraKpiTotalHours',
             kpiCountId: 'extraKpiTaskCount',
             badgeId: 'extraWorkloadTableCountBadge',
-            overviewId: 'ovExtraHours'
+            overviewId: 'ovExtraHours',
+            overviewCountId: 'ovExtraTasks'
         },
         FDP_Workshop: {
             tableId: 'facultyFdpWorkloadList',
             kpiTotalId: 'fdpKpiTotalHours',
             kpiCountId: 'fdpKpiCount',
             badgeId: 'fdpWorkloadTableCountBadge',
-            overviewId: 'ovFdpHours'
+            overviewId: 'ovFdpHours',
+            overviewCountId: 'ovFdpTasks'
         },
         Research: {
             tableId: 'facultyResearchWorkloadList',
             kpiTotalId: 'researchKpiTotalHours',
             kpiCountId: 'researchKpiCount',
             badgeId: 'researchWorkloadTableCountBadge',
-            overviewId: 'ovResearchHours'
+            overviewId: 'ovResearchHours',
+            overviewCountId: 'ovResearchTasks'
         },
         Consultancy: {
             tableId: 'facultyConsultancyWorkloadList',
             kpiTotalId: 'consultancyKpiTotalHours',
             kpiCountId: 'consultancyKpiCount',
             badgeId: 'consultancyWorkloadTableCountBadge',
-            overviewId: 'ovConsultancyHours'
+            overviewId: 'ovConsultancyHours',
+            overviewCountId: 'ovConsultancyTasks'
         }
     };
 
-    // Preloaded comprehensive multi-domain allocations for Grace Hopper (Faculty ID 2)
-    let multiDomainAllocations = [
-        // Department
-        { id: 1, category: 'Department', task_id: 'T001', role_name: 'Faculty Advisor', task_name: 'Attendance monitoring', work_unit: 'Student', quantity: 45, std_effort: 0.03, occurrences: 16, complexity_factor: 1.0, calculated_workload: 21.60, remarks: 'B.Tech CS Sem 5' },
-        { id: 2, category: 'Department', task_id: 'T002', role_name: 'Faculty Advisor', task_name: 'Student counselling / progress review', work_unit: 'Student', quantity: 45, std_effort: 0.08, occurrences: 4, complexity_factor: 1.25, calculated_workload: 18.00, remarks: 'Semester reviews' },
-        { id: 3, category: 'Department', task_id: 'T008', role_name: 'DQAC', task_name: 'Academic audit / result analysis', work_unit: 'Audit', quantity: 1, std_effort: 5.0, occurrences: 2, complexity_factor: 1.5, calculated_workload: 15.00, remarks: 'Department quality audits' },
-
-        // Institutional
-        { id: 4, category: 'Institutional', task_id: 'INST02', role_name: 'IQAC', task_name: 'NAAC / NBA Institutional Criteria Lead', work_unit: 'Criterion', quantity: 1, std_effort: 6.0, occurrences: 4, complexity_factor: 1.5, calculated_workload: 36.00, remarks: 'Criteria 2 & 3 Lead' },
-        { id: 5, category: 'Institutional', task_id: 'INST07', role_name: 'Examination Cell', task_name: 'Chief Superintendent / University Exam Officer', work_unit: 'Session', quantity: 1, std_effort: 3.5, occurrences: 8, complexity_factor: 1.25, calculated_workload: 35.00, remarks: 'Autonomous ESE Supervision' },
-
-        // Extra Proactive
-        { id: 6, category: 'ExtraProactive', task_id: 'EX01', role_name: 'Technical Clubs', task_name: 'Faculty Advisor for Coding Club / Google DSC / ACM / CSI', work_unit: 'Month', quantity: 1, std_effort: 2.5, occurrences: 5, complexity_factor: 1.25, calculated_workload: 15.63, remarks: 'Weekly competitive programming sessions' },
-        { id: 7, category: 'ExtraProactive', task_id: 'EX02', role_name: 'Technical Clubs', task_name: 'Organizing Hackathons / 24-hr Coding Contests', work_unit: 'Event', quantity: 1, std_effort: 6.0, occurrences: 2, complexity_factor: 1.5, calculated_workload: 18.00, remarks: 'State-level Hackathon' },
-
-        // FDPs & Workshops
-        { id: 8, category: 'FDP_Workshop', task_id: 'FD03', role_name: 'Workshops Conducted', task_name: 'Organizing 2-3 Day Specialized Technology Bootcamp', work_unit: 'Workshop', quantity: 1, std_effort: 5.0, occurrences: 2, complexity_factor: 1.25, calculated_workload: 12.50, remarks: 'Hands-on Cloud & Kubernetes Bootcamp' },
-        { id: 9, category: 'FDP_Workshop', task_id: 'FD05', role_name: 'Resource Person', task_name: 'Resource Person / Keynote Speaker at External College', work_unit: 'Talk', quantity: 2, std_effort: 3.0, occurrences: 4, complexity_factor: 1.5, calculated_workload: 36.00, remarks: 'Keynotes on Distributed Systems' },
-
-        // Research
-        { id: 10, category: 'Research', task_id: 'RS05', role_name: 'Research Guidance', task_name: 'MCA / M.Tech Research Project & Dissertation Guide [23MCAN402]', work_unit: 'Student/Team', quantity: 3, std_effort: 2.0, occurrences: 12, complexity_factor: 1.25, calculated_workload: 90.00, remarks: 'Sem 4 MCA Project Guidance' },
-        { id: 11, category: 'Research', task_id: 'RS07', role_name: 'Publications', task_name: 'Publication in SCI / SCIE / Scopus Q1/Q2 Indexed Journal', work_unit: 'Paper', quantity: 1, std_effort: 12.0, occurrences: 1, complexity_factor: 1.5, calculated_workload: 18.00, remarks: 'Paper on High-Performance Distributed Computing' },
-
-        // Consultancy
-        { id: 12, category: 'Consultancy', task_id: 'CN01', role_name: 'Software Consultancy', task_name: 'Industrial Software Product Architecture & Lead Developer', work_unit: 'Project', quantity: 1, std_effort: 10.0, occurrences: 2, complexity_factor: 1.5, calculated_workload: 30.00, remarks: 'Logistics portal optimization' }
-    ];
+    let multiDomainAllocations = [];
 
     async function fetchAllCatalogsFromBackend() {
         try {
@@ -1500,19 +1656,50 @@ document.addEventListener('DOMContentLoaded', () => {
         await fetchAllCatalogsFromBackend();
 
         try {
+            if (!authToken) {
+                throw new Error('Sign in to load your workload details.');
+            }
             const headers = {};
             if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
 
-            const res = await fetch(`${API_URL}/api/workload/department/faculty?faculty_id=${currentFaculty.id}&category=all`, {
+            const res = await fetch(`${API_URL}/api/workload/department/faculty?category=all`, {
                 headers: headers
             });
             const data = await res.json();
 
-            if (data.success && Array.isArray(data.allocations) && data.allocations.length > 0) {
-                multiDomainAllocations = data.allocations;
+            if (!res.ok || !data.success || !Array.isArray(data.allocations)) {
+                throw new Error(data.message || 'Failed to load your workload allocations.');
             }
+            multiDomainAllocations = data.allocations;
         } catch (err) {
-            console.warn('Backend unavailable, using local multi-domain workload allocations:', err);
+            console.error('Load faculty workload error:', err);
+            Object.values(DOMAIN_SECTIONS).forEach(conf => {
+                const totalEl = document.getElementById(conf.kpiTotalId);
+                const countEl = document.getElementById(conf.kpiCountId);
+                const badgeEl = document.getElementById(conf.badgeId);
+                const overviewEl = document.getElementById(conf.overviewId);
+                const overviewCountEl = document.getElementById(conf.overviewCountId);
+                const tbody = document.getElementById(conf.tableId);
+                if (totalEl) totalEl.textContent = 'Unavailable';
+                if (countEl) countEl.textContent = '—';
+                if (badgeEl) badgeEl.textContent = 'Unavailable';
+                if (overviewEl) overviewEl.textContent = 'Unavailable';
+                if (overviewCountEl) overviewCountEl.textContent = 'Unavailable';
+                if (tbody) {
+                    tbody.innerHTML = '';
+                    const row = document.createElement('tr');
+                    const cell = document.createElement('td');
+                    cell.colSpan = 11;
+                    cell.setAttribute('role', 'alert');
+                    cell.style.textAlign = 'center';
+                    cell.textContent = err.message;
+                    row.appendChild(cell);
+                    tbody.appendChild(row);
+                }
+            });
+            const grandTotal = document.getElementById('statTotalWorkloadHours');
+            if (grandTotal) grandTotal.textContent = 'Unavailable';
+            return;
         }
 
         let grandTotalMultiDomainHours = 0;
@@ -1535,11 +1722,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const countEl = document.getElementById(conf.kpiCountId);
             const badgeEl = document.getElementById(conf.badgeId);
             const ovStatEl = document.getElementById(conf.overviewId);
+            const overviewCountEl = document.getElementById(conf.overviewCountId);
 
             if (totalEl) totalEl.textContent = `${catHours.toFixed(2)} hrs`;
             if (countEl) countEl.textContent = items.length;
             if (badgeEl) badgeEl.textContent = `${items.length} Tasks Active`;
             if (ovStatEl) ovStatEl.textContent = `${catHours.toFixed(2)} hrs`;
+            if (overviewCountEl) overviewCountEl.textContent = `${items.length} Tasks`;
 
             if (catKey === 'Department') {
                 const statDept = document.getElementById('statDeptHours');
@@ -1848,14 +2037,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 submitBtn.textContent = 'Saving...';
             }
 
-            // Save in local state first for instant responsiveness
-            const existingIdx = multiDomainAllocations.findIndex(x => x.task_id === taskId);
-            if (existingIdx >= 0) {
-                multiDomainAllocations[existingIdx] = payload;
-            } else {
-                multiDomainAllocations.push(payload);
-            }
-
             try {
                 const headers = { 'Content-Type': 'application/json' };
                 if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
@@ -1867,21 +2048,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const data = await res.json();
 
-                if (data.success) {
-                    window.closeDeptModal();
-                    await window.renderAllFacultyWorkloads();
-                    alert(`✓ [${category}] task [${taskId}] allocated successfully! (${totalWorkload} hrs added)`);
-                } else {
-                    // Even if API returns non-success, local was saved
-                    window.closeDeptModal();
-                    await window.renderAllFacultyWorkloads();
-                    alert(`✓ Allocated [${taskId}] locally (${totalWorkload} hrs).`);
+                if (!res.ok || !data.success) {
+                    throw new Error(data.message || 'Could not save this workload allocation.');
                 }
-            } catch (err) {
-                console.warn('Saved allocation locally:', err);
                 window.closeDeptModal();
                 await window.renderAllFacultyWorkloads();
-                alert(`✓ [${category}] task [${taskId}] recorded locally (${totalWorkload} hrs).`);
+                alert(`✓ [${category}] task [${taskId}] allocated successfully! (${totalWorkload} hrs added)`);
+            } catch (err) {
+                console.error('Save faculty workload allocation error:', err);
+                alert(err.message || 'Could not save this workload allocation.');
             } finally {
                 if (submitBtn) {
                     submitBtn.disabled = false;
@@ -1895,20 +2070,21 @@ document.addEventListener('DOMContentLoaded', () => {
     window.deleteDeptWorkloadItem = async function(taskId, category = 'Department') {
         if (!confirm(`Are you sure you want to remove task allocation [${taskId}]?`)) return;
 
-        // Local deletion
-        multiDomainAllocations = multiDomainAllocations.filter(x => x.task_id !== taskId);
-
         try {
             const headers = {};
             if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
 
-            const res = await fetch(`${API_URL}/api/workload/department/faculty/${taskId}?faculty_id=${currentFaculty.id}`, {
+            const res = await fetch(`${API_URL}/api/workload/department/faculty/${taskId}`, {
                 method: 'DELETE',
                 headers: headers
             });
-            await res.json();
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.message || 'Could not delete workload allocation.');
+            }
         } catch (e) {
-            console.warn('Removed locally:', e);
+            console.error('Delete faculty workload allocation error:', e);
+            alert(e.message || 'Could not delete workload allocation.');
         }
 
         await window.renderAllFacultyWorkloads();
@@ -1921,4 +2097,3 @@ document.addEventListener('DOMContentLoaded', () => {
     window.renderAllFacultyWorkloads();
 
 });
-

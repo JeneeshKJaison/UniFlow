@@ -42,11 +42,18 @@ Client Files: `UI/hod/dashboard.html`, `UI/hod/js/hod.js`, `UI/hod/css/hod.css`.
 - **Status:** **IMPLEMENTED AND CONNECTED TO API.**
 
 #### Feature 3: Multi-Domain Department Workload Analytics
-- **User Workflow:** HOD selects "Department Workload" tab, filters by category (Department, Institutional, ExtraProactive, FDP_Workshop, Research, Consultancy), views table of faculty duty allocations and aggregate hours.
+- **User Workflow:** HOD selects "Department Workload" tab, filters by category (Department, Institutional, ExtraProactive, FDP_Workshop, Research, Consultancy), views table of faculty duty allocations and aggregate hours. The overall workload chart uses the API's per-faculty total, combining academic workload units, all cross-domain allocations, and active assigned-task hours.
 - **Frontend File & Function:** `UI/hod/js/hod.js:fetchDeptHodSummary()`, `renderDeptWorkloadTable()`.
 - **Backend Route & Controller:** `GET /api/workload/department/hod/summary` $\rightarrow$ `workloadController.js:1037` (`getHodDepartmentSummary`).
-- **Tables & Columns Touched:** Reads `faculty_department_workload`, `users`.
+- **Tables & Columns Touched:** Reads `faculty_department_workload`, `workload_master`, `tasks`, `users`.
 - **Status:** **IMPLEMENTED AND CONNECTED TO API.**
+
+#### Feature 3a: Faculty Multi-Domain Workload Details
+- **User Workflow:** Faculty dashboard loads authenticated allocations for all six workload categories, shows hours and task counts on the portfolio cards, and lists each allocation's calculation details in its category view.
+- **Frontend File & Function:** `UI/faculty/js/faculty.js:renderAllFacultyWorkloads()`.
+- **Backend Route & Controller:** `GET /api/workload/department/faculty` $\rightarrow$ `workloadController.js:getFacultyDepartmentWorkload`.
+- **Tables & Columns Touched:** Reads `faculty_department_workload`; read, save, and delete operations are scoped to the authenticated faculty account.
+- **Status:** **IMPLEMENTED AND CONNECTED TO API.** Failed loads are displayed instead of silently substituting demo allocations.
 
 #### Feature 4: Timetable Matrix
 - **User Workflow:** HOD views weekly class periods per course and semester.
@@ -54,11 +61,19 @@ Client Files: `UI/hod/dashboard.html`, `UI/hod/js/hod.js`, `UI/hod/css/hod.css`.
 - **Backend Route:** None. Uses `defaultTimetable` array stored in `localStorage` under `uniflow_timetable`.
 - **Status:** **MOCKED WITH `localStorage`.** (Table `timetable` in PostgreSQL has 0 rows).
 
-#### Feature 5: Student Grievance Resolution
-- **User Workflow:** HOD reviews student grievance list, enters resolution remarks in modal, and clicks "Send Remark".
-- **Frontend File & Function:** `UI/hod/js/hod.js:renderGrievances()`, `openGrievanceModal()`.
-- **Backend Route:** None. Mutates in-memory array (`UI/hod/js/hod.js:1263`: `g.resolution = remarks; g.status = 'Remark Sent';`).
-- **Status:** **FRONTEND ONLY (STATIC SAMPLE DATA).** (Table `grievances` has 0 rows).
+#### Feature 5: Student Grievance Resolution & HOD Escalation
+- **User Workflow:** A student selects a faculty member in their department and files a grievance. The faculty member has seven days to mark it resolved and may add an optional resolution comment; the student then confirms. The grievance closes only after both confirmations. If either confirmation is missing at the deadline, it is automatically escalated to the department HOD. The comment is shown to the student.
+- **Frontend:** `UI/student/js/student.js`, `UI/faculty/js/faculty.js`, and `UI/hod/js/hod.js`.
+- **Backend:** `backend/src/controllers/grievanceController.js`, `backend/src/services/grievanceService.js`, `backend/src/routes/grievanceRoutes.js`.
+- **Database:** `student_grievances` stores ownership, the seven-day deadline, each confirmation, and HOD escalation.
+- **Status:** **IMPLEMENTED AND CONNECTED TO API.** Role checks restrict each party to their own actions and records.
+
+#### Feature 5a: Faculty Grievance Resolution with HOD
+- **User Workflow:** A faculty member files a grievance with a HOD assigned to one of their departments. The HOD has seven days to respond and mark it resolved, optionally adding a resolution comment; the filing faculty member must then confirm before it closes. The comment is shown to the filing faculty member.
+- **Frontend:** `UI/faculty/dashboard.html`, `UI/faculty/js/faculty.js`, `UI/hod/dashboard.html`, and `UI/hod/js/hod.js`.
+- **Backend:** `backend/src/controllers/grievanceController.js` and `backend/src/routes/grievanceRoutes.js`.
+- **Database:** `faculty_hod_grievances` stores the department, parties, seven-day deadline, and both resolution confirmations.
+- **Status:** **IMPLEMENTED AND CONNECTED TO API.** Role and department membership checks restrict filing, HOD responses, and faculty confirmations.
 
 #### Feature 6: Department Messaging / Chat
 - **User Workflow:** Chat widget displays pre-populated dialogue between HOD and faculty.
@@ -89,8 +104,8 @@ Client Files: `UI/faculty/dashboard.html`, `UI/faculty/js/faculty.js`, `UI/css/t
 - **Status:** **IMPLEMENTED AND CONNECTED TO API.**
 
 #### Feature 3: Student Assignment Creation & Collision Prevention (Engine B)
-- **User Workflow:** Faculty creates an assignment for their class. Clicks "Check Collision". If daily load $> 10$ or weekly load $> 18$, system alerts with candidate dates. Faculty can pick an alternative date or force submission via override checkbox.
-- **Frontend File & Function:** `UI/faculty/js/faculty.js:checkStudentCollision()`, `publishStudentAssignment()`.
+- **User Workflow:** Faculty creates an assignment for their class. If the daily class workload would exceed 15 points or the rolling seven-day workload would exceed 18 points, the dashboard suggests dates meeting both limits. The assignment endpoint rechecks workload inside a class/semester transaction lock and rejects overloaded dates.
+- **Frontend File & Function:** `UI/faculty/js/faculty.js` assignment form handler and `executeSaveStudentAssignment()`.
 - **Backend Routes & Controller:**
   - `POST /api/faculty/student-assignments/check` $\rightarrow$ `facultyController.js:171` (`checkStudentWorkload`).
   - `POST /api/faculty/student-assignments` $\rightarrow$ `facultyController.js:338` (`assignWorkToStudents`).

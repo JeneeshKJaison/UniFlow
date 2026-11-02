@@ -8,6 +8,8 @@ const authRoutes = require('./routes/authRoutes');
 const workloadRoutes = require("./routes/workloadRoutes");
 const facultyRoutes = require("./routes/facultyRoutes");
 const studentRoutes = require("./routes/studentRoutes");
+const grievanceRoutes = require("./routes/grievanceRoutes");
+const { escalateOverdueGrievances } = require('./services/grievanceService');
 
 const app = express();
 
@@ -23,6 +25,7 @@ app.use('/api/auth', authRoutes);
 app.use("/api/workload", workloadRoutes);
 app.use("/api/faculty", facultyRoutes);
 app.use("/api/student", studentRoutes);
+app.use("/api/grievances", grievanceRoutes);
 
 
 // ==========================
@@ -37,9 +40,10 @@ app.get('/', (req, res) => {
 
 
 const initWorkloadTables = require('./config/initWorkloadTables');
+const initGrievanceTables = require('./config/initGrievanceTables');
 
-// Auto-migrate task table columns if not exists & clear Linus Torvalds tasks & initialize workload tables
-(async () => {
+// Auto-migrate task columns and initialize dependent workload tables before accepting requests.
+const initializeDatabase = async () => {
     try {
         await pool.query(`
             ALTER TABLE tasks ADD COLUMN IF NOT EXISTS faculty_remark TEXT;
@@ -48,20 +52,15 @@ const initWorkloadTables = require('./config/initWorkloadTables');
             ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;
         `);
 
-        // Clear tasks for Linus Torvalds (linus@uniflow.edu)
-        const clearLinusRes = await pool.query(`
-            DELETE FROM tasks 
-            WHERE assigned_to IN (SELECT id FROM users WHERE email = 'linus@uniflow.edu' OR name ILIKE '%Linus%')
-            RETURNING id
-        `);
-        console.log(`✓ Task columns verified. Cleared ${clearLinusRes.rowCount} workload tasks for Linus Torvalds.`);
-
-        // Ensure all workload tables and schema additions exist
+        console.log('✓ Task columns verified.');
         await initWorkloadTables();
+        await initGrievanceTables();
+        await escalateOverdueGrievances();
     } catch (e) {
-        console.error('Database initialization check error:', e.message);
+        console.error('Database initialization failed:', e);
+        throw e;
     }
-})();
+};
 
 // ==========================
 // Database Test Route
@@ -91,6 +90,25 @@ app.get('/api/db-test', async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-    console.log(`UniFlow Backend running on http://localhost:${PORT}`);
-});
+initializeDatabase()
+    .then(() => {
+        const escalationInterval = setInterval(() => {
+            escalateOverdueGrievances()
+                .then((count) => {
+                    if (count > 0) {
+                        console.log(`✓ Automatically escalated ${count} overdue grievance(s).`);
+                    }
+                })
+                .catch((error) => {
+                    console.error('Automatic grievance escalation failed:', error);
+                });
+        }, 60_000);
+        escalationInterval.unref();
+
+        app.listen(PORT, () => {
+            console.log(`UniFlow Backend running on http://localhost:${PORT}`);
+        });
+    })
+    .catch(() => {
+        process.exitCode = 1;
+    });

@@ -1,6 +1,32 @@
 const pool = require("../config/db");
 
-const WORKLOAD_THRESHOLD = 15;
+const WORKLOAD_THRESHOLD = 120;
+
+const getOverallFacultyWorkload = async (db, facultyId) => {
+    const result = await db.query(
+        `
+        SELECT
+            COALESCE((
+                SELECT SUM(grand_total_workload_units)
+                FROM workload_master
+                WHERE faculty_id = $1
+            ), 0)
+            + COALESCE((
+                SELECT SUM(calculated_workload)
+                FROM faculty_department_workload
+                WHERE faculty_id = $1
+            ), 0)
+            + COALESCE((
+                SELECT SUM(COALESCE(estimated_hours, difficulty, 0))
+                FROM tasks
+                WHERE assigned_to = $1
+                  AND (status IS NULL OR LOWER(status) != 'completed')
+            ), 0) AS current_workload
+        `,
+        [facultyId]
+    );
+    return Number(result.rows[0]?.current_workload || 0);
+};
 
 
 // =====================================================
@@ -90,9 +116,7 @@ const getSubjects = async (req, res) => {
 
 const getFaculty = async (req, res) => {
     try {
-        const currentUserId = req.user?.userId || req.user?.id;
-
-        let query = `
+        const query = `
             SELECT 
                 u.id,
                 u.custom_id,
@@ -102,13 +126,16 @@ const getFaculty = async (req, res) => {
                 u.is_hod,
                 COALESCE(
                     (
-                        SELECT SUM(t.difficulty)
+                        SELECT SUM(COALESCE(t.estimated_hours, t.difficulty, 0))
                         FROM tasks t
                         WHERE t.assigned_to = u.id
-                          AND (t.status IS NULL OR t.status != 'completed')
+                          AND (t.status IS NULL OR LOWER(t.status) != 'completed')
                     ),
                     0
-                ) AS total_active_workload,
+                )
+                + COALESCE((SELECT SUM(grand_total_workload_units) FROM workload_master WHERE faculty_id = u.id), 0)
+                + COALESCE((SELECT SUM(calculated_workload) FROM faculty_department_workload WHERE faculty_id = u.id), 0)
+                AS total_active_workload,
                 COALESCE(
                     json_agg(
                         DISTINCT jsonb_build_object('id', s.id, 'name', s.name, 'code', s.code, 'semester', s.semester)
@@ -119,31 +146,10 @@ const getFaculty = async (req, res) => {
             LEFT JOIN subject_faculty sf ON u.id = sf.faculty_id
             LEFT JOIN subjects s ON sf.subject_id = s.id
             WHERE u.role = 'faculty' AND u.is_hod = false
+            GROUP BY u.id, u.custom_id, u.name, u.email, u.role, u.is_hod
+            ORDER BY u.name ASC
         `;
-        const params = [];
-
-        if (req.user?.isHod && currentUserId) {
-            const deptRes = await pool.query(
-                `SELECT id FROM departments WHERE hod_user_id = $1 UNION SELECT department_id FROM user_departments WHERE user_id = $1`,
-                [currentUserId]
-            );
-            if (deptRes.rows.length > 0) {
-                const deptIds = deptRes.rows.map(r => r.id);
-                params.push(deptIds);
-                query += ` AND u.id IN (
-                    SELECT user_id FROM user_departments WHERE department_id = ANY($${params.length})
-                    UNION
-                    SELECT sf2.faculty_id FROM subject_faculty sf2 
-                    JOIN subjects s2 ON sf2.subject_id = s2.id 
-                    JOIN courses c2 ON s2.course_id = c2.id 
-                    WHERE c2.department_id = ANY($${params.length})
-                )`;
-            }
-        }
-
-        query += ` GROUP BY u.id, u.custom_id, u.name, u.email, u.role, u.is_hod ORDER BY u.name ASC`;
-
-        const result = await pool.query(query, params);
+        const result = await pool.query(query);
 
         return res.status(200).json({
             success: true,
@@ -175,6 +181,10 @@ const getTasks = async (req, res) => {
                 t.subject_id,
                 t.description,
                 t.difficulty,
+                t.estimated_hours,
+                COALESCE(t.estimated_hours, t.difficulty, 0) AS workload_points,
+                t.assignment_type,
+                t.category_name,
                 t.deadline,
                 t.scheduled_date,
                 t.status,
@@ -213,58 +223,63 @@ const getTasks = async (req, res) => {
 const suggestTask = async (req, res) => {
     try {
         const {
+            assignment_type,
+            category_name,
             subject_id,
             assigned_to,
             description,
-            difficulty,
+            estimated_hours,
             deadline,
             scheduled_date
         } = req.body;
+        if (!['subject', 'other'].includes(assignment_type)) {
+            return res.status(400).json({ success: false, message: "Select either subject-related work or other work." });
+        }
+        const assignmentType = assignment_type;
+        const facultyId = Number(assigned_to);
+        const subjectId = subject_id ? Number(subject_id) : null;
+        const hours = Number(estimated_hours);
+        const startDate = scheduled_date;
+        const endDate = deadline || scheduled_date;
 
-        if (
-            !subject_id ||
-            !assigned_to ||
-            !description ||
-            !difficulty ||
-            !scheduled_date
-        ) {
+        if (!Number.isInteger(facultyId) || facultyId < 1 ||
+            !description?.trim() || !Number.isFinite(hours) || hours <= 0 ||
+            !startDate || !category_name?.trim() ||
+            (assignmentType === 'subject' && (!Number.isInteger(subjectId) || subjectId < 1))) {
             return res.status(400).json({
                 success: false,
-                message: "Please provide all required task details (subject, faculty, description, difficulty, scheduled date)."
+                message: "Provide a faculty member, category, description, positive estimated hours, and scheduled date. Subject-related work also requires a subject."
+            });
+        }
+        if (Number.isNaN(Date.parse(startDate)) || Number.isNaN(Date.parse(endDate)) ||
+            new Date(endDate) < new Date(startDate)) {
+            return res.status(400).json({
+                success: false,
+                message: "The deadline must be on or after the scheduled date."
             });
         }
 
-        const taskDifficulty = parseInt(difficulty);
-        if (taskDifficulty < 1 || taskDifficulty > 10) {
-            return res.status(400).json({
-                success: false,
-                message: "Difficulty must be between 1 and 10."
-            });
+        const durationDays = Math.round((Date.parse(endDate) - Date.parse(startDate)) / 86400000);
+        const facultyInfo = await pool.query(
+            `SELECT id, name, email FROM users WHERE id = $1 AND role = 'faculty' AND is_hod = false`,
+            [facultyId]
+        );
+        if (!facultyInfo.rows.length) {
+            return res.status(400).json({ success: false, message: "Select an assignable faculty member." });
         }
+        const facultyName = facultyInfo.rows[0].name;
 
-        const facultyId = parseInt(assigned_to);
-        const start_date = scheduled_date;
-        const end_date = deadline || scheduled_date;
-
-        // Calculate task duration in days
-        const sDate = new Date(start_date);
-        const eDate = new Date(end_date);
-        const durationDays = Math.max(0, Math.round((eDate - sDate) / (1000 * 60 * 60 * 24)));
-
-        // 1. Fetch current faculty info & active overlapping workload during [start_date, end_date]
-        const facultyInfo = await pool.query(`SELECT id, name, email FROM users WHERE id = $1`, [facultyId]);
-        const facultyName = facultyInfo.rows[0]?.name || "Faculty Member";
-
-        const workloadResult = await pool.query(
+        const [currentWorkload, workloadResult] = await Promise.all([
+            getOverallFacultyWorkload(pool, facultyId),
+            pool.query(
             `
-            SELECT 
-                COALESCE(SUM(t.difficulty), 0) AS current_workload,
-                COALESCE(
+            SELECT COALESCE(
                     json_agg(
                         json_build_object(
                             'id', t.id,
                             'description', t.description,
-                            'difficulty', t.difficulty,
+                            'workload_points', COALESCE(t.estimated_hours, t.difficulty, 0),
+                            'estimated_hours', t.estimated_hours,
                             'scheduled_date', t.scheduled_date,
                             'deadline', t.deadline,
                             'status', t.status
@@ -274,131 +289,120 @@ const suggestTask = async (req, res) => {
                 ) AS overlapping_tasks
             FROM tasks t
             WHERE t.assigned_to = $1
-              AND (t.status IS NULL OR t.status != 'completed')
-              AND t.scheduled_date <= $3
-              AND COALESCE(t.deadline, t.scheduled_date) >= $2
+              AND (t.status IS NULL OR LOWER(t.status) != 'completed')
+              AND t.scheduled_date <= $3::date
+              AND COALESCE(t.deadline, t.scheduled_date) >= $2::date
             `,
-            [facultyId, start_date, end_date]
-        );
+            [facultyId, startDate, endDate]
+            )
+        ]);
 
-        const currentWorkload = parseInt(workloadResult.rows[0]?.current_workload || 0);
         const overlappingTasks = workloadResult.rows[0]?.overlapping_tasks || [];
-        const resultingWorkload = currentWorkload + taskDifficulty;
+        const resultingWorkload = currentWorkload + hours;
 
-        // 2. Find Alternative Dates for this faculty (looking up to 30 days ahead where workload fits)
         const altDatesResult = await pool.query(
             `
             SELECT 
                 TO_CHAR(d::date, 'YYYY-MM-DD') AS alternative_scheduled_date,
                 TO_CHAR((d::date + $4 * INTERVAL '1 day')::date, 'YYYY-MM-DD') AS alternative_deadline,
-                COALESCE(
-                    (
-                        SELECT SUM(t.difficulty)
-                        FROM tasks t
-                        WHERE t.assigned_to = $1
-                          AND (t.status IS NULL OR t.status != 'completed')
-                          AND t.scheduled_date <= (d::date + $4 * INTERVAL '1 day')::date
-                          AND COALESCE(t.deadline, t.scheduled_date) >= d::date
-                    ),
-                    0
-                ) AS existing_workload
+                COALESCE((SELECT SUM(grand_total_workload_units) FROM workload_master WHERE faculty_id = $1), 0)
+                + COALESCE((SELECT SUM(calculated_workload) FROM faculty_department_workload WHERE faculty_id = $1), 0)
+                + COALESCE((
+                    SELECT SUM(COALESCE(t.estimated_hours, t.difficulty, 0))
+                    FROM tasks t
+                    WHERE t.assigned_to = $1
+                      AND (t.status IS NULL OR LOWER(t.status) != 'completed')
+                      AND t.scheduled_date <= (d::date + $4 * INTERVAL '1 day')::date
+                      AND COALESCE(t.deadline, t.scheduled_date) >= d::date
+                ), 0) AS existing_workload
             FROM generate_series(
                 $2::date + INTERVAL '1 day',
                 $2::date + INTERVAL '30 days',
                 INTERVAL '1 day'
             ) AS d
-            WHERE COALESCE(
-                (
-                    SELECT SUM(t.difficulty)
+            WHERE COALESCE((SELECT SUM(grand_total_workload_units) FROM workload_master WHERE faculty_id = $1), 0)
+                + COALESCE((SELECT SUM(calculated_workload) FROM faculty_department_workload WHERE faculty_id = $1), 0)
+                + COALESCE((
+                    SELECT SUM(COALESCE(t.estimated_hours, t.difficulty, 0))
                     FROM tasks t
                     WHERE t.assigned_to = $1
-                      AND (t.status IS NULL OR t.status != 'completed')
+                      AND (t.status IS NULL OR LOWER(t.status) != 'completed')
                       AND t.scheduled_date <= (d::date + $4 * INTERVAL '1 day')::date
                       AND COALESCE(t.deadline, t.scheduled_date) >= d::date
-                ),
-                0
-            ) + $3 <= $5
+                ), 0) + $3 <= $5
             ORDER BY existing_workload ASC, d ASC
             LIMIT 4
             `,
-            [facultyId, start_date, taskDifficulty, durationDays, WORKLOAD_THRESHOLD]
+            [facultyId, startDate, hours, durationDays, WORKLOAD_THRESHOLD]
         );
 
-        // Format alternative dates with resulting workload
         const alternativeDates = altDatesResult.rows.map(r => ({
             scheduled_date: r.alternative_scheduled_date,
             deadline: r.alternative_deadline,
-            existing_workload: parseInt(r.existing_workload),
-            resulting_workload: parseInt(r.existing_workload) + taskDifficulty
+            existing_workload: Number(r.existing_workload),
+            resulting_workload: Number(r.existing_workload) + hours
         }));
 
-        // 3. Find Alternative Faculty who teach the same subject or in the same department and have capacity
         const altFacultyResult = await pool.query(
             `
             SELECT 
                 u.id,
                 u.name,
                 u.email,
-                COALESCE(
-                    (
-                        SELECT SUM(t.difficulty)
-                        FROM tasks t
-                        WHERE t.assigned_to = u.id
-                          AND (t.status IS NULL OR t.status != 'completed')
-                          AND t.scheduled_date <= $3
-                          AND COALESCE(t.deadline, t.scheduled_date) >= $2
-                    ),
-                    0
-                ) AS current_workload,
+                COALESCE((SELECT SUM(grand_total_workload_units) FROM workload_master WHERE faculty_id = u.id), 0)
+                + COALESCE((SELECT SUM(calculated_workload) FROM faculty_department_workload WHERE faculty_id = u.id), 0)
+                + COALESCE((
+                    SELECT SUM(COALESCE(t.estimated_hours, t.difficulty, 0))
+                    FROM tasks t
+                    WHERE t.assigned_to = u.id
+                      AND (t.status IS NULL OR LOWER(t.status) != 'completed')
+                ), 0) AS current_workload,
                 (
                     SELECT COUNT(*) 
                     FROM subject_faculty sf 
-                    WHERE sf.subject_id = $4 AND sf.faculty_id = u.id
+                    WHERE sf.subject_id = $2::int AND sf.faculty_id = u.id
                 ) > 0 AS teaches_subject
             FROM users u
             WHERE u.role = 'faculty'
               AND u.is_hod = false
               AND u.id != $1
               AND (
-                  u.id IN (SELECT sf.faculty_id FROM subject_faculty sf WHERE sf.subject_id = $4)
+                  $3 = 'other'
+                  OR u.id IN (SELECT sf.faculty_id FROM subject_faculty sf WHERE sf.subject_id = $2::int)
                   OR
                   u.id IN (
                       SELECT ud.user_id FROM user_departments ud
                       WHERE ud.department_id IN (
-                          SELECT ud2.department_id FROM user_departments ud2 WHERE ud2.user_id = $1
+                          SELECT ud2.department_id FROM user_departments ud2 WHERE ud2.user_id = $4
                           UNION
-                          SELECT c.department_id FROM subjects s JOIN courses c ON s.course_id = c.id WHERE s.id = $4
+                          SELECT c.department_id FROM subjects s JOIN courses c ON s.course_id = c.id WHERE s.id = $2::int
                       )
                   )
               )
             GROUP BY u.id, u.name, u.email
-            HAVING COALESCE(
-                (
-                    SELECT SUM(t.difficulty)
+            HAVING COALESCE((SELECT SUM(grand_total_workload_units) FROM workload_master WHERE faculty_id = u.id), 0)
+                + COALESCE((SELECT SUM(calculated_workload) FROM faculty_department_workload WHERE faculty_id = u.id), 0)
+                + COALESCE((
+                    SELECT SUM(COALESCE(t.estimated_hours, t.difficulty, 0))
                     FROM tasks t
                     WHERE t.assigned_to = u.id
-                      AND (t.status IS NULL OR t.status != 'completed')
-                      AND t.scheduled_date <= $3
-                      AND COALESCE(t.deadline, t.scheduled_date) >= $2
-                ),
-                0
-            ) + $5 <= $6
+                      AND (t.status IS NULL OR LOWER(t.status) != 'completed')
+                ), 0) + $5 <= $6
             ORDER BY teaches_subject DESC, current_workload ASC, u.name ASC
             LIMIT 5
             `,
-            [facultyId, start_date, end_date, parseInt(subject_id), taskDifficulty, WORKLOAD_THRESHOLD]
+            [facultyId, subjectId, assignmentType, req.user?.userId || req.user?.id || 0, hours, WORKLOAD_THRESHOLD]
         );
 
         const alternativeFaculty = altFacultyResult.rows.map(f => ({
             id: f.id,
             name: f.name,
             email: f.email,
-            current_workload: parseInt(f.current_workload),
-            resulting_workload: parseInt(f.current_workload) + taskDifficulty,
+            current_workload: Number(f.current_workload),
+            resulting_workload: Number(f.current_workload) + hours,
             teaches_subject: f.teaches_subject
         }));
 
-        // 4. Decision
         const canAssign = resultingWorkload <= WORKLOAD_THRESHOLD;
 
         return res.status(200).json({
@@ -406,23 +410,26 @@ const suggestTask = async (req, res) => {
             can_assign: canAssign,
             message: canAssign
                 ? `${facultyName} is available for this assignment.`
-                : `Faculty workload would exceed the maximum threshold of ${WORKLOAD_THRESHOLD} points.`,
+                : `This assignment would exceed the ${WORKLOAD_THRESHOLD}-point workload threshold.`,
             selected_faculty: {
                 id: facultyId,
                 name: facultyName,
                 current_workload: currentWorkload,
-                added_difficulty: taskDifficulty,
+                estimated_hours: hours,
+                added_workload_points: hours,
                 resulting_workload: resultingWorkload
             },
             overlapping_tasks: overlappingTasks,
             threshold: WORKLOAD_THRESHOLD,
             task: {
-                subject_id: parseInt(subject_id),
+                assignment_type: assignmentType,
+                category_name: category_name.trim(),
+                subject_id: assignmentType === 'subject' ? subjectId : null,
                 assigned_to: facultyId,
-                description,
-                difficulty: taskDifficulty,
+                description: description.trim(),
+                estimated_hours: hours,
                 deadline: deadline || null,
-                scheduled_date
+                scheduled_date: startDate
             },
             recommendations: {
                 alternative_dates: alternativeDates,
@@ -434,7 +441,9 @@ const suggestTask = async (req, res) => {
         console.error("Suggest task error:", error);
         return res.status(500).json({
             success: false,
-            message: "Server error while calculating workload capacity."
+            message: error.code === '42703'
+                ? "Task database columns are outdated. Apply the task migration and restart the backend."
+                : "Server error while calculating workload capacity. Check the backend logs for details."
         });
     }
 };
@@ -445,12 +454,16 @@ const suggestTask = async (req, res) => {
 // =====================================================
 
 const assignTask = async (req, res) => {
+    const client = await pool.connect();
+    let transactionStarted = false;
     try {
         const {
+            assignment_type,
+            category_name,
             subject_id,
             assigned_to,
             description,
-            difficulty,
+            estimated_hours,
             deadline,
             scheduled_date
         } = req.body;
@@ -464,87 +477,93 @@ const assignTask = async (req, res) => {
             });
         }
 
-        if (
-            !subject_id ||
-            !assigned_to ||
-            !description ||
-            !difficulty ||
-            !scheduled_date
-        ) {
+        if (!['subject', 'other'].includes(assignment_type)) {
+            return res.status(400).json({ success: false, message: "Select either subject-related work or other work." });
+        }
+        const assignmentType = assignment_type;
+        const facultyId = Number(assigned_to);
+        const subjectId = subject_id ? Number(subject_id) : null;
+        const hours = Number(estimated_hours);
+        if (!Number.isInteger(facultyId) || facultyId < 1 ||
+            !description?.trim() || !Number.isFinite(hours) || hours <= 0 ||
+            !scheduled_date || !category_name?.trim() ||
+            (assignmentType === 'subject' && (!Number.isInteger(subjectId) || subjectId < 1))) {
             return res.status(400).json({
                 success: false,
-                message: "Please provide all required task details."
+                message: "Provide a faculty member, category, description, positive estimated hours, and scheduled date. Subject-related work also requires a subject."
+            });
+        }
+        const endDate = deadline || scheduled_date;
+        if (Number.isNaN(Date.parse(scheduled_date)) || Number.isNaN(Date.parse(endDate)) ||
+            new Date(endDate) < new Date(scheduled_date)) {
+            return res.status(400).json({
+                success: false,
+                message: "The deadline must be on or after the scheduled date."
             });
         }
 
-        const taskDifficulty = parseInt(difficulty);
-        const facultyId = parseInt(assigned_to);
-        const start_date = scheduled_date;
-        const end_date = deadline || scheduled_date;
-
-        if (taskDifficulty < 1 || taskDifficulty > 10) {
-            return res.status(400).json({
-                success: false,
-                message: "Difficulty must be between 1 and 10."
-            });
-        }
-
-        // Check active overlapping workload in database
-        const workloadResult = await pool.query(
-            `
-            SELECT COALESCE(SUM(t.difficulty), 0) AS current_workload
-            FROM tasks t
-            WHERE t.assigned_to = $1
-              AND (t.status IS NULL OR t.status != 'completed')
-              AND t.scheduled_date <= $3
-              AND COALESCE(t.deadline, t.scheduled_date) >= $2
-            `,
-            [facultyId, start_date, end_date]
+        await client.query('BEGIN');
+        transactionStarted = true;
+        const facultyResult = await client.query(
+            `SELECT id FROM users WHERE id = $1 AND role = 'faculty' AND is_hod = false FOR UPDATE`,
+            [facultyId]
         );
+        if (!facultyResult.rows.length) {
+            await client.query('ROLLBACK');
+            transactionStarted = false;
+            return res.status(400).json({ success: false, message: "Select an assignable faculty member." });
+        }
 
-        const currentWorkload = parseInt(workloadResult.rows[0]?.current_workload || 0);
-        const resultingWorkload = currentWorkload + taskDifficulty;
+        const currentWorkload = await getOverallFacultyWorkload(client, facultyId);
+        const resultingWorkload = currentWorkload + hours;
 
-        // STRICT CHECK: Reject if total active workload would exceed threshold
         if (resultingWorkload > WORKLOAD_THRESHOLD) {
+            await client.query('ROLLBACK');
+            transactionStarted = false;
             return res.status(409).json({
                 success: false,
                 can_assign: false,
-                message: `Workload limit exceeded. Faculty current workload is ${currentWorkload} pts. Adding ${taskDifficulty} pts reaches ${resultingWorkload} pts (Maximum allowed: ${WORKLOAD_THRESHOLD} pts).`,
+                message: `Workload limit exceeded. Current overall workload is ${currentWorkload.toFixed(2)} points; adding ${hours} hours (${hours} points) would reach ${resultingWorkload.toFixed(2)} points (maximum ${WORKLOAD_THRESHOLD}).`,
                 current_workload: currentWorkload,
-                requested_difficulty: taskDifficulty,
+                requested_hours: hours,
                 resulting_workload: resultingWorkload,
                 threshold: WORKLOAD_THRESHOLD
             });
         }
 
-        // Insert task into database
-        const taskResult = await pool.query(
+        const taskResult = await client.query(
             `
             INSERT INTO tasks (
                 created_by,
                 assigned_to,
                 subject_id,
+                assignment_type,
+                category_name,
                 description,
+                estimated_hours,
                 difficulty,
                 deadline,
                 scheduled_date,
                 status
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, $8, $9, $10)
             RETURNING *
             `,
             [
                 created_by,
                 facultyId,
-                parseInt(subject_id),
-                description,
-                taskDifficulty,
+                assignmentType === 'subject' ? subjectId : null,
+                assignmentType,
+                category_name.trim(),
+                description.trim(),
+                hours,
                 deadline || null,
                 scheduled_date,
                 "approved"
             ]
         );
+        await client.query('COMMIT');
+        transactionStarted = false;
 
         return res.status(201).json({
             success: true,
@@ -552,18 +571,30 @@ const assignTask = async (req, res) => {
             task: taskResult.rows[0],
             workload: {
                 previous: currentWorkload,
-                added: taskDifficulty,
+                added_hours: hours,
+                added_workload_points: hours,
                 total: resultingWorkload,
                 threshold: WORKLOAD_THRESHOLD
             }
         });
 
     } catch (error) {
+        if (transactionStarted) {
+            await client.query('ROLLBACK').catch(rollbackError => {
+                console.error("Task assignment rollback error:", rollbackError);
+            });
+        }
         console.error("Assign task error:", error);
         return res.status(500).json({
             success: false,
-            message: "Server error while assigning task."
+            message: error.code === '23503'
+                ? "The selected faculty, creator, or subject is no longer available. Refresh the page and try again."
+                : error.code === '42703'
+                    ? "Task database columns are outdated. Apply the task migration and restart the backend."
+                    : "Server error while assigning task. Check the backend logs for details."
         });
+    } finally {
+        client.release();
     }
 };
 
@@ -849,7 +880,7 @@ const getDepartmentMaster = async (req, res) => {
 
 const getFacultyDepartmentWorkload = async (req, res) => {
     try {
-        const facultyId = req.user?.userId || req.user?.id || req.query?.faculty_id || 2;
+        const facultyId = req.user.userId;
         const { category } = req.query;
 
         let query = `
@@ -936,7 +967,7 @@ const getFacultyDepartmentWorkload = async (req, res) => {
 
 const saveFacultyDepartmentWorkload = async (req, res) => {
     try {
-        const facultyId = req.user?.userId || req.user?.id || req.body?.faculty_id || 2;
+        const facultyId = req.user.userId;
 
         const userRes = await pool.query('SELECT name FROM users WHERE id = $1', [facultyId]);
         const facultyName = userRes.rows[0]?.name || 'Faculty Member';
@@ -1006,7 +1037,7 @@ const saveFacultyDepartmentWorkload = async (req, res) => {
 
 const deleteFacultyDepartmentWorkload = async (req, res) => {
     try {
-        const facultyId = req.user?.userId || req.user?.id || req.query?.faculty_id || 2;
+        const facultyId = req.user.userId;
         const { id } = req.params;
 
         let query = '';
@@ -1045,34 +1076,34 @@ const getHodDepartmentSummary = async (req, res) => {
         const currentUserId = req.user?.userId || req.user?.id;
         const selectedCategory = req.query?.category || 'Department';
 
-        let facultyQuery = `
-            SELECT id, custom_id, name, email
-            FROM users
-            WHERE role = 'faculty' AND is_hod = false
+        const facultyQuery = `
+            SELECT
+                faculty.id,
+                faculty.custom_id,
+                faculty.name,
+                faculty.email,
+                COALESCE((
+                    SELECT SUM(master.grand_total_workload_units)
+                    FROM workload_master AS master
+                    WHERE master.faculty_id = faculty.id
+                ), 0) AS academic_workload_units,
+                COALESCE((
+                    SELECT SUM(allocation.calculated_workload)
+                    FROM faculty_department_workload AS allocation
+                    WHERE allocation.faculty_id = faculty.id
+                ), 0) AS overall_cross_domain_workload_hours,
+                COALESCE((
+                    SELECT SUM(COALESCE(task.estimated_hours, task.difficulty, 0))
+                    FROM tasks AS task
+                    WHERE task.assigned_to = faculty.id
+                      AND (task.status IS NULL OR LOWER(task.status) != 'completed')
+                ), 0) AS active_task_workload_hours
+            FROM users AS faculty
+            WHERE faculty.role = 'faculty'
+              AND (faculty.is_hod = false OR faculty.id = $1)
+            ORDER BY name ASC
         `;
-        const params = [];
-
-        if (req.user?.isHod && currentUserId) {
-            const deptRes = await pool.query(
-                `SELECT id FROM departments WHERE hod_user_id = $1 UNION SELECT department_id FROM user_departments WHERE user_id = $1`,
-                [currentUserId]
-            );
-            if (deptRes.rows.length > 0) {
-                const deptIds = deptRes.rows.map(r => r.id);
-                params.push(deptIds);
-                facultyQuery += ` AND id IN (
-                    SELECT user_id FROM user_departments WHERE department_id = ANY($${params.length})
-                    UNION
-                    SELECT sf.faculty_id FROM subject_faculty sf 
-                    JOIN subjects s ON sf.subject_id = s.id 
-                    JOIN courses c ON s.course_id = c.id 
-                    WHERE c.department_id = ANY($${params.length})
-                )`;
-            }
-        }
-
-        facultyQuery += ` ORDER BY name ASC`;
-        const facultyRes = await pool.query(facultyQuery, params);
+        const facultyRes = await pool.query(facultyQuery, [currentUserId || 0]);
         const facultyList = facultyRes.rows;
 
         // Query allocations, optionally filtered by category
@@ -1100,6 +1131,14 @@ const getHodDepartmentSummary = async (req, res) => {
                 custom_id: f.custom_id || `FAC${f.id}`,
                 faculty_name: f.name,
                 email: f.email,
+                academic_workload_units: Number(f.academic_workload_units || 0),
+                overall_cross_domain_workload_hours: Number(f.overall_cross_domain_workload_hours || 0),
+                active_task_workload_hours: Number(f.active_task_workload_hours || 0),
+                overall_workload: Number((
+                    Number(f.academic_workload_units || 0)
+                    + Number(f.overall_cross_domain_workload_hours || 0)
+                    + Number(f.active_task_workload_hours || 0)
+                ).toFixed(2)),
                 department_workload_hours: 0,
                 number_of_tasks: 0,
                 tasks: []
@@ -1132,8 +1171,7 @@ const getHodDepartmentSummary = async (req, res) => {
         const facultySummary = Object.values(facultyMap);
 
         const departmentTotalHours = facultySummary.reduce((sum, f) => sum + f.department_workload_hours, 0);
-        const activeFacultiesWithTasks = facultySummary.filter(f => f.number_of_tasks > 0);
-        const divisor = activeFacultiesWithTasks.length > 0 ? activeFacultiesWithTasks.length : (facultySummary.length || 1);
+        const divisor = facultySummary.length || 1;
         const departmentAverageHours = parseFloat((departmentTotalHours / divisor).toFixed(2));
 
         facultySummary.forEach(f => {

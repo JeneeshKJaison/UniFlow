@@ -37,10 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: 7, customId: 'FAC005', name: 'Marie Curie', role: 'faculty', deptId: 3, isHOD: true, deptName: 'Physics' }
         ],
         tasks: [],
-        grievances: [
-            { id: 1, fromId: 2, subject: 'Projector broken in Lab 3', details: 'The overhead projector in Lab 3 is completely unresponsive. Need it fixed for tomorrow.', date: '2026-07-09', status: 'Pending' },
-            { id: 2, fromId: 3, subject: 'Schedule Clash', details: 'My DBMS lecture is clashing with the final year seminar.', date: '2026-07-08', status: 'Resolved' }
-        ],
         chatMessages: [
             { senderId: 2, text: 'Hello everyone, please submit attendance by EOD.', timestamp: '10:00 AM' },
             { senderId: 4, text: 'Noted, ma\'am.', timestamp: '10:05 AM' }
@@ -110,6 +106,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderTasks();
             } else if(targetId === 'overview') {
                 renderOverview();
+            } else if(targetId === 'grievances') {
+                renderGrievances();
             }
         });
     });
@@ -275,7 +273,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const token = localStorage.getItem('uniflow_token') || localStorage.getItem('token');
         let faculty = getFacultyInDept().filter(f => !f.isHOD);
         const students = getStudentsInDept();
-        let activeTasks = dataStore.tasks.filter(t => t.status === 'Active');
+        let activeTasks = [];
+        let taskLoadError = token ? '' : 'Please sign in again to load tasks from the database.';
 
         // Fetch live faculty and tasks from backend if connected
         if (token) {
@@ -295,12 +294,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 if (taskRes.ok) {
                     const taskData = await taskRes.json();
-                    if (taskData.success && taskData.tasks) {
+                    if (taskData.success && Array.isArray(taskData.tasks)) {
                         activeTasks = taskData.tasks;
+                    } else {
+                        taskLoadError = taskData.message || 'The server returned an invalid task list.';
                     }
+                } else if (taskRes.status === 401) {
+                    taskLoadError = 'Your session is invalid or expired. Please sign out and sign in again.';
+                } else {
+                    taskLoadError = `Unable to load tasks (HTTP ${taskRes.status}).`;
                 }
             } catch (e) {
                 console.warn('Overview backend load note:', e);
+                taskLoadError = 'Unable to reach the backend. Make sure it is running, then refresh this page.';
             }
         }
 
@@ -318,7 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let totalDiff = fac.total_active_workload;
                 if (totalDiff === undefined) {
                     const facTasks = activeTasks.filter(t => (t.assigned_to || t.assigneeId) === fac.id);
-                    totalDiff = facTasks.reduce((sum, t) => sum + (t.difficulty || 0), 0);
+                    totalDiff = facTasks.reduce((sum, t) => sum + Number(t.workload_points ?? t.estimated_hours ?? t.difficulty ?? 0), 0);
                 } else {
                     totalDiff = parseInt(totalDiff) || 0;
                 }
@@ -349,21 +355,29 @@ document.addEventListener('DOMContentLoaded', () => {
             urgentTasksList.innerHTML = '';
             const urgentTasks = [...activeTasks].slice(0, 5);
             
-            if (urgentTasks.length === 0) {
+            if (taskLoadError) {
+                const errorRow = document.createElement('tr');
+                const errorCell = document.createElement('td');
+                errorCell.colSpan = 5;
+                errorCell.style.cssText = 'text-align: center; color: var(--danger-color); padding: 16px;';
+                errorCell.textContent = taskLoadError;
+                errorRow.appendChild(errorCell);
+                urgentTasksList.appendChild(errorRow);
+            } else if (urgentTasks.length === 0) {
                 urgentTasksList.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-light); padding: 16px;">No active tasks.</td></tr>';
             } else {
                 urgentTasks.forEach(t => {
                     const desc = t.description || t.desc;
                     const assignee = t.assignee_name || getUserName(t.assigned_to || t.assigneeId);
-                    const diff = t.difficulty || 5;
+                    const diff = Number(t.workload_points ?? t.estimated_hours ?? t.difficulty ?? 0);
                     const days = t.deadline ? `Due: ${new Date(t.deadline).toLocaleDateString()}` : (t.deadlineDays ? `In ${t.deadlineDays} days` : 'Active');
                     const status = t.status || 'Active';
                     
                     urgentTasksList.innerHTML += `
                         <tr>
-                            <td>${desc}</td>
+                            <td>${desc}<br><small>${t.category_name || t.subject_name || 'General work'} · ${t.estimated_hours ? `${t.estimated_hours} hours` : `${diff} workload points`}</small></td>
                             <td>${assignee}</td>
-                            <td>${diff}/10</td>
+                            <td>${diff} points</td>
                             <td>${days}</td>
                             <td><span class="status-badge" style="background: rgba(11, 122, 117, 0.15); color: var(--primary-color);">${status}</span></td>
                         </tr>
@@ -560,14 +574,29 @@ document.addEventListener('DOMContentLoaded', () => {
         const token = localStorage.getItem('uniflow_token') || localStorage.getItem('token');
         const assigneeSelect = document.getElementById('taskAssignee');
         const subjectSelect = document.getElementById('taskSubject');
+        const assignmentTypeSelect = document.getElementById('taskAssignmentType');
+        const subjectGroup = document.getElementById('taskSubjectGroup');
+        const otherCategoryGroup = document.getElementById('taskOtherCategoryGroup');
         const tbody = document.getElementById('allTasksList');
 
-        if (!assigneeSelect || !subjectSelect) return;
+        if (!assigneeSelect || !subjectSelect || !assignmentTypeSelect) return;
 
         assigneeSelect.innerHTML = '<option value="">-- Select Faculty --</option>';
         subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
+        const updateCategoryFields = () => {
+            const isSubject = assignmentTypeSelect.value === 'subject';
+            subjectGroup.style.display = isSubject ? '' : 'none';
+            otherCategoryGroup.style.display = isSubject ? 'none' : '';
+            subjectSelect.required = isSubject;
+            subjectSelect.disabled = !isSubject;
+            const otherCategoryInput = document.getElementById('taskOtherCategory');
+            otherCategoryInput.required = !isSubject;
+            otherCategoryInput.disabled = isSubject;
+        };
+        updateCategoryFields();
+        assignmentTypeSelect.onchange = updateCategoryFields;
 
-        let facultyList = getFacultyInDept().filter(f => !f.isHOD);
+        let facultyList = [];
         let subjectsList = dataStore.subjects || [];
         let activeTasksList = dataStore.tasks || [];
 
@@ -578,12 +607,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const facRes = await fetch('http://localhost:5000/api/workload/faculty', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                if (facRes.ok) {
-                    const facData = await facRes.json();
-                    if (facData.success && facData.faculty && facData.faculty.length > 0) {
-                        facultyList = facData.faculty;
-                    }
+                if (!facRes.ok) {
+                    throw new Error(`Unable to load faculty (HTTP ${facRes.status}).`);
                 }
+                const facData = await facRes.json();
+                if (!facData.success || !Array.isArray(facData.faculty)) {
+                    throw new Error(facData.message || 'The server returned an invalid faculty list.');
+                }
+                facultyList = facData.faculty;
 
                 // 2. Fetch subjects from backend
                 const subRes = await fetch('http://localhost:5000/api/workload/subjects', {
@@ -591,7 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 if (subRes.ok) {
                     const subData = await subRes.json();
-                    if (subData.success && subData.subjects && subData.subjects.length > 0) {
+                    if (subData.success && Array.isArray(subData.subjects)) {
                         subjectsList = subData.subjects;
                     }
                 }
@@ -604,21 +635,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     const taskData = await taskRes.json();
                     if (taskData.success && taskData.tasks) {
                         activeTasksList = taskData.tasks;
+                        dataStore.tasks = activeTasksList;
                     }
                 }
             } catch (err) {
-                console.warn('Backend connection note: using available department store data', err);
+                console.error('Task assignment data load failed:', err);
+                facultyList = [];
             }
+        } else {
+            assigneeSelect.options[0].textContent = 'Sign in to load faculty';
         }
 
         // Populate Faculty dropdown
-        facultyList.forEach(f => {
-            assigneeSelect.innerHTML += `<option value="${f.id}">${f.name} (${f.email || f.custom_id || 'Faculty'})</option>`;
-        });
+        if (facultyList.length > 0) {
+            facultyList.forEach(f => {
+                assigneeSelect.innerHTML += `<option value="${f.id}">${f.name} (${f.email || f.custom_id || 'Faculty'})</option>`;
+            });
+        } else if (token) {
+            assigneeSelect.options[0].textContent = 'Unable to load faculty — check backend connection';
+        }
 
         // Helper function to render subjects in dropdown
         function updateSubjectDropdown(filterFacultyId = null) {
+            const selectedSubjectId = subjectSelect.value;
             subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
+            if (subjectsList.length === 0) {
+                subjectSelect.options[0].textContent = 'No subjects available';
+            }
             subjectsList.forEach(s => {
                 const semInfo = s.semester ? ` - Sem ${s.semester}` : '';
                 const codeInfo = s.code ? ` (${s.code})` : '';
@@ -633,6 +676,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const badge = isAllocated ? ' ★ Taught by Selected Faculty' : '';
                 subjectSelect.innerHTML += `<option value="${s.id}">${s.name}${codeInfo}${semInfo}${badge}</option>`;
             });
+            if (subjectsList.some(s => String(s.id) === selectedSubjectId)) {
+                subjectSelect.value = selectedSubjectId;
+            }
         }
 
         // Initially render all subjects
@@ -655,11 +701,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     const desc = t.description || t.desc;
                     const daysText = t.deadline ? `Due: ${new Date(t.deadline).toLocaleDateString()}` : (t.deadlineDays ? `In ${t.deadlineDays} days` : 'Active');
                     const attachIcon = t.attachment ? `<span style="color:var(--primary-color);" title="${t.attachment}">📎 ${t.attachment}</span>` : '<span style="color:var(--text-light);">None</span>';
-                    const subBadge = (t.subject_name || t.subject_code) ? `<br><small style="color: var(--primary-color); font-weight: 500;">${t.subject_name || ''} ${t.subject_code ? `(${t.subject_code})` : ''}</small>` : '';
+                    const category = t.category_name || t.subject_name || 'General work';
+                    const workloadPoints = Number(t.workload_points ?? t.estimated_hours ?? t.difficulty ?? 0);
+                    const categoryBadge = `<br><small style="color: var(--primary-color); font-weight: 500;">${category}${t.subject_code ? ` (${t.subject_code})` : ''} · ${workloadPoints} workload points</small>`;
 
                     tbody.innerHTML += `
                         <tr>
-                            <td><strong>${desc}</strong>${subBadge}</td>
+                            <td><strong>${desc}</strong>${categoryBadge}</td>
                             <td>${assigneeName}</td>
                             <td>${daysText}</td>
                             <td>${attachIcon}</td>
@@ -668,20 +716,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         }
+
+        renderCalendar();
     }
 
     document.getElementById('assignTaskForm').addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const assigneeId = parseInt(document.getElementById('taskAssignee').value);
-        const subjectId = parseInt(document.getElementById('taskSubject').value);
+        const assignmentType = document.getElementById('taskAssignmentType').value;
+        const subjectId = assignmentType === 'subject' ? parseInt(document.getElementById('taskSubject').value) : null;
+        const subjectOption = document.getElementById('taskSubject').selectedOptions[0];
+        const categoryName = assignmentType === 'subject'
+            ? subjectOption?.textContent.split(' ★')[0].trim()
+            : document.getElementById('taskOtherCategory').value.trim();
         const desc = document.getElementById('taskDesc').value;
-        const difficulty = parseInt(document.getElementById('taskDifficulty').value);
+        const estimatedHours = Number(document.getElementById('taskEstimatedHours').value);
         const deadlineDate = document.getElementById('taskDeadline').value;
         const scheduledDate = document.getElementById('taskScheduledDate').value;
 
-        if (!assigneeId || !subjectId) {
-            alert('Please select both a faculty member and a subject.');
+        if (!assigneeId || (assignmentType === 'subject' && !subjectId) || !categoryName || !Number.isFinite(estimatedHours) || estimatedHours <= 0) {
+            alert('Select a faculty member and complete the required work category and estimated hours.');
             return;
         }
 
@@ -701,10 +756,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
+                    assignment_type: assignmentType,
+                    category_name: categoryName,
                     subject_id: subjectId,
                     assigned_to: assigneeId,
                     description: desc,
-                    difficulty: difficulty,
+                    estimated_hours: estimatedHours,
                     deadline: deadlineDate || null,
                     scheduled_date: scheduledDate
                 })
@@ -722,10 +779,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const faculty = result.selected_faculty;
                 const confirmAssignment = confirm(
                     `Faculty workload is acceptable.\n\n` +
-                    `• Current Workload: ${faculty.current_workload} pts\n` +
-                    `• Task Difficulty: +${difficulty} pts\n` +
-                    `• Resulting Workload: ${faculty.resulting_workload} pts\n` +
-                    `• Maximum Limit: ${result.threshold} pts\n\n` +
+                    `• Current Workload: ${faculty.current_workload} points\n` +
+                    `• Estimated Time: ${estimatedHours} hours (+${estimatedHours} points)\n` +
+                    `• Resulting Workload: ${faculty.resulting_workload} points\n` +
+                    `• Maximum Limit: ${result.threshold} points\n\n` +
                     `Do you want to approve and assign this task?`
                 );
 
@@ -768,15 +825,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Reset form
             document.getElementById('assignTaskForm').reset();
+            document.getElementById('taskAssignmentType').dispatchEvent(new Event('change'));
 
             // Refresh UI components
-            renderTasks();
+            await renderTasks();
             if (typeof renderOverview === 'function') renderOverview();
             if (typeof renderCalendar === 'function') renderCalendar();
 
         } catch (error) {
             console.error('Approval error:', error);
-            alert('Unable to approve and save the task.');
+            alert(`Unable to approve and save the task: ${error.message}`);
         }
     }
 
@@ -791,12 +849,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const altDatesContainer = document.getElementById('altDatesContainer');
 
         if (!modal) {
-            alert(`⚠️ Workload Exceeded!\nFaculty current workload: ${result.current_workload} pts. Adding ${result.selected_faculty?.added_difficulty || result.requested_difficulty} pts reaches ${result.resulting_workload} pts (Limit: ${result.threshold} pts).`);
+            alert(`Workload exceeded. Current workload: ${result.current_workload} points; result: ${result.resulting_workload} points (limit: ${result.threshold}).`);
             return;
         }
 
         const fac = result.selected_faculty || {};
-        const addedDiff = fac.added_difficulty || result.requested_difficulty || 0;
+        const addedHours = fac.estimated_hours || result.task?.estimated_hours || 0;
         const total = fac.resulting_workload || result.resulting_workload || 0;
 
         summary.innerHTML = `
@@ -805,10 +863,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     <strong>${fac.name || 'Selected Faculty'}</strong> cannot take this assignment on the selected dates.
                 </p>
                 <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.9rem;">
-                    <div>• Current Active Workload: <strong>${fac.current_workload} pts</strong></div>
-                    <div>• Task Difficulty: <strong style="color: #e53e3e;">+${addedDiff} pts</strong></div>
-                    <div>• Resulting Total: <strong style="color: #e53e3e;">${total} pts</strong></div>
-                    <div>• Max Threshold: <strong>${result.threshold} pts</strong></div>
+                    <div>• Current Active Workload: <strong>${fac.current_workload} points</strong></div>
+                    <div>• Estimated Time: <strong>${addedHours} hours (+${addedHours} points)</strong></div>
+                    <div>• Resulting Total: <strong style="color: #e53e3e;">${total} points</strong></div>
+                    <div>• Max Threshold: <strong>${result.threshold} points</strong></div>
                 </div>
             </div>
         `;
@@ -820,7 +878,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h5 style="margin: 0 0 6px 0; color: var(--text-light);">Conflicting Active Tasks During This Period:</h5>
                     <ul style="margin: 0; padding-left: 18px; font-size: 0.85rem; color: var(--text-light);">
                         ${result.overlapping_tasks.map(t => `
-                            <li><strong>${t.description}</strong> (${t.difficulty} pts) — Active from ${t.scheduled_date} to ${t.deadline || t.scheduled_date}</li>
+                            <li><strong>${t.description}</strong> (${t.workload_points} points) — Active from ${t.scheduled_date} to ${t.deadline || t.scheduled_date}</li>
                         `).join('')}
                     </ul>
                 </div>
@@ -840,7 +898,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <strong style="color: var(--text-color);">${f.name}</strong>
                         ${f.teaches_subject ? '<span style="background: rgba(11, 122, 117, 0.2); color: var(--primary-color); font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">Teaches this subject</span>' : ''}
                         <div style="font-size: 0.8rem; color: var(--text-light); margin-top: 2px;">
-                            Current Workload: ${f.current_workload} pts → Resulting: ${f.resulting_workload} / ${result.threshold} pts
+                            Current Workload: ${f.current_workload} points → Resulting: ${f.resulting_workload} / ${result.threshold} points
                         </div>
                     </div>
                     <button type="button" class="btn-primary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="applyAlternativeFaculty(${f.id}, '${f.name}')">
@@ -850,7 +908,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `).join('');
         } else {
             altFacultyContainer.style.display = 'block';
-            altFacultyList.innerHTML = '<p style="color: var(--text-light); font-size: 0.85rem; margin: 0;">No other faculty in this department have capacity for this subject during these dates.</p>';
+            altFacultyList.innerHTML = '<p style="color: var(--text-light); font-size: 0.85rem; margin: 0;">No other faculty in this department have capacity during these dates.</p>';
         }
 
         // Render alternative dates
@@ -862,7 +920,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div>
                         <strong style="color: var(--text-color);">${d.scheduled_date}</strong> (Due: ${d.deadline})
                         <div style="font-size: 0.8rem; color: var(--text-light); margin-top: 2px;">
-                            Workload on this window: ${d.existing_workload} pts → Resulting: ${d.resulting_workload} / ${result.threshold} pts
+                            Workload on this window: ${d.existing_workload} points → Resulting: ${d.resulting_workload} / ${result.threshold} points
                         </div>
                     </div>
                     <button type="button" class="btn-primary" style="background: #2563eb; padding: 6px 12px; font-size: 0.85rem;" onclick="applyAlternativeDate('${d.scheduled_date}', '${d.deadline}')">
@@ -913,6 +971,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderCalendar() {
         const grid = document.getElementById('calendarGrid');
         const displayMonthYear = document.getElementById('currentMonthYear');
+        if (!grid || !displayMonthYear) return;
         grid.innerHTML = '';
         
         const year = currentCalDate.getFullYear();
@@ -921,14 +980,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
         displayMonthYear.textContent = `${monthNames[month]} ${year}`;
         
-        // Calculate task dates (assuming 'today' is the baseline for deadlineDays)
         const today = new Date();
         today.setHours(0,0,0,0);
-        
-        const tasksWithDates = dataStore.tasks.map(t => {
-            const date = new Date(today);
-            date.setDate(today.getDate() + t.deadlineDays);
-            return { ...t, targetDate: date };
+        const tasksByDate = new Map();
+        (dataStore.tasks || []).forEach(task => {
+            const dateValue = task.scheduled_date || task.deadline;
+            if (!dateValue) return;
+            const dateKey = String(dateValue).split('T')[0];
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return;
+            if (!tasksByDate.has(dateKey)) tasksByDate.set(dateKey, []);
+            tasksByDate.get(dateKey).push(task);
         });
 
         const firstDayOfMonth = new Date(year, month, 1).getDay();
@@ -941,15 +1002,23 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Render days
         for (let day = 1; day <= daysInMonth; day++) {
-            const dateObj = new Date(year, month, day);
-            const dayTasks = tasksWithDates.filter(t => t.targetDate.getFullYear() === year && t.targetDate.getMonth() === month && t.targetDate.getDate() === day);
-            
+            const dayKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const dayTasks = tasksByDate.get(dayKey) || [];
+            const dailyWorkload = dayTasks.reduce(
+                (total, task) => {
+                    const points = Number(task.workload_points ?? task.estimated_hours ?? task.difficulty ?? 0);
+                    return total + (Number.isFinite(points) ? points : 0);
+                },
+                0
+            );
             let classStr = 'calendar-day';
             
             if (dayTasks.length > 0) {
                 classStr += ' has-tasks';
-                const hasUrgent = dayTasks.some(t => t.deadlineDays <= 2);
-                if (hasUrgent) classStr += ' urgent';
+                if (dailyWorkload <= 5) classStr += ' workload-low';
+                else if (dailyWorkload <= 10) classStr += ' workload-medium';
+                else if (dailyWorkload <= 15) classStr += ' workload-high';
+                else classStr += ' workload-overloaded';
             }
             
             if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
@@ -957,8 +1026,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             grid.innerHTML += `
-                <div class="${classStr}" data-day="${day}">
+                <div class="${classStr}" data-day="${day}" ${dayTasks.length ? `title="${dayTasks.length} assigned task${dayTasks.length === 1 ? '' : 's'} · ${dailyWorkload.toFixed(2)} workload points"` : ''}>
                     <span class="day-number">${day}</span>
+                    ${dayTasks.length ? `<small class="calendar-task-count">${dayTasks.length} task${dayTasks.length === 1 ? '' : 's'}</small>` : ''}
                 </div>
             `;
         }
@@ -968,7 +1038,7 @@ document.addEventListener('DOMContentLoaded', () => {
             el.addEventListener('click', () => {
                 document.querySelectorAll('.calendar-day').forEach(d => d.classList.remove('selected'));
                 el.classList.add('selected');
-                showTasksForDate(year, month, parseInt(el.getAttribute('data-day')), tasksWithDates);
+                showTasksForDate(year, month, parseInt(el.getAttribute('data-day')), tasksByDate);
             });
         });
         
@@ -976,7 +1046,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('calendarTaskDetails').style.display = 'none';
     }
 
-    function showTasksForDate(year, month, day, tasksWithDates) {
+    function showTasksForDate(year, month, day, tasksByDate) {
         const detailsContainer = document.getElementById('calendarTaskDetails');
         const selectedDateTasks = document.getElementById('selectedDateTasks');
         const selectedDateDisplay = document.getElementById('selectedDateDisplay');
@@ -984,20 +1054,31 @@ document.addEventListener('DOMContentLoaded', () => {
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         selectedDateDisplay.textContent = `${monthNames[month]} ${day}, ${year}`;
         
-        const dayTasks = tasksWithDates.filter(t => t.targetDate.getFullYear() === year && t.targetDate.getMonth() === month && t.targetDate.getDate() === day);
+        const dayKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dayTasks = tasksByDate.get(dayKey) || [];
         
         selectedDateTasks.innerHTML = '';
         if (dayTasks.length === 0) {
-            selectedDateTasks.innerHTML = '<p style="color:var(--text-light);">No tasks due on this date.</p>';
+            selectedDateTasks.innerHTML = '<p style="color:var(--text-light);">No tasks scheduled on this date.</p>';
         } else {
             dayTasks.forEach(t => {
+                const assignee = t.assignee_name || getUserName(t.assigned_to || t.assigneeId);
+                const description = t.description || t.desc || 'Assigned task';
+                const category = t.category_name || t.subject_name || 'General work';
+                const workloadPoints = Number(t.workload_points ?? t.estimated_hours ?? t.difficulty ?? 0);
+                const scheduledDate = String(t.scheduled_date || '').split('T')[0];
+                const deadlineText = t.deadline && String(t.deadline).split('T')[0] !== scheduledDate
+                    ? `Due ${new Date(`${String(t.deadline).split('T')[0]}T00:00:00`).toLocaleDateString()}`
+                    : '';
                 selectedDateTasks.innerHTML += `
                     <div class="task-detail-card">
-                        <strong style="font-size: 1.1rem; display:block; margin-bottom:4px;">${t.desc}</strong>
+                        <strong style="font-size: 1.1rem; display:block; margin-bottom:4px;">${description}</strong>
                         <div style="color:var(--text-light); font-size: 0.9rem;">
-                            <span>Assigned to: ${getUserName(t.assigneeId)}</span> &bull; 
-                            <span>Difficulty: ${t.difficulty}/10</span> &bull; 
-                            <span style="color: ${t.deadlineDays <= 2 ? '#e53e3e' : 'var(--text-light)'}">Status: ${t.status}</span>
+                            <span>${category}</span> &bull;
+                            <span>Assigned to: ${assignee}</span> &bull;
+                            <span>${t.estimated_hours ? `${t.estimated_hours} hours` : `${workloadPoints} workload points`}</span>
+                            ${deadlineText ? ` &bull; <span>${deadlineText}</span>` : ''}
+                            &bull; <span>Status: ${t.status || 'Pending'}</span>
                         </div>
                     </div>
                 `;
@@ -1009,11 +1090,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Month navigation listeners
     document.getElementById('prevMonth')?.addEventListener('click', () => {
+        currentCalDate.setDate(1);
         currentCalDate.setMonth(currentCalDate.getMonth() - 1);
         renderCalendar();
     });
 
     document.getElementById('nextMonth')?.addEventListener('click', () => {
+        currentCalDate.setDate(1);
         currentCalDate.setMonth(currentCalDate.getMonth() + 1);
         renderCalendar();
     });
@@ -1211,84 +1294,151 @@ document.addEventListener('DOMContentLoaded', () => {
         switchChat(groupId, name, name.charAt(0).toUpperCase(), `${members.length} members`, true);
     });
 
-    // --- 6. Grievances ---
-    function renderGrievances() {
-        const tbody = document.getElementById('grievanceList');
-        tbody.innerHTML = '';
-        dataStore.grievances.forEach(g => {
-            let statColor = '#dd6b20'; // Pending
-            if (g.status === 'Resolved') statColor = '#48bb78';
-            else if (g.status === 'Remark Sent') statColor = '#3182ce';
-            
-            tbody.innerHTML += `
-                <tr>
-                    <td>${g.date}</td>
-                    <td>${getUserName(g.fromId)}</td>
-                    <td>${g.subject}</td>
-                    <td style="color:${statColor}; font-weight:500;">${g.status}</td>
-                    <td>
-                        <button class="action-btn" onclick="viewGrievance(${g.id})">View</button>
-                    </td>
-                </tr>
-            `;
-        });
+    // --- 6. Escalated Student Grievances ---
+    let hodGrievances = [];
+
+    function escapeGrievanceHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, character => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        })[character]);
     }
 
-    window.viewGrievance = function(id) {
-        const g = dataStore.grievances.find(x => x.id === id);
-        if(!g) return;
-        
-        document.getElementById('grievanceDetails').innerHTML = `
-            <strong>From:</strong> ${getUserName(g.fromId)}<br>
-            <strong>Date:</strong> ${g.date}<br>
-            <strong>Subject:</strong> ${g.subject}<br><br>
-            <p style="padding:16px; background:rgba(0,0,0,0.1); border-radius:8px;">${g.details}</p>
-        `;
-        
-        const resolveBtn = document.getElementById('resolveGrievanceBtn');
-        const sendRemarkBtn = document.getElementById('sendRemarkBtn');
-        const resSection = document.getElementById('grievanceResolutionSection');
-        const remarksInput = document.getElementById('grievanceRemarks');
-
-        if (g.status === 'Pending' || g.status === 'Remark Sent') {
-            document.getElementById('grievanceActionButtons').style.display = 'flex';
-            resSection.style.display = 'block';
-            remarksInput.value = g.resolution || '';
-            remarksInput.disabled = false;
-            
-            sendRemarkBtn.onclick = () => {
-                const remarks = remarksInput.value.trim();
-                if (!remarks) {
-                    alert('Please enter a remark to send.');
-                    return;
-                }
-                g.resolution = remarks;
-                g.status = 'Remark Sent';
-                alert('Remark saved successfully!');
-                document.getElementById('grievanceModal').classList.remove('active');
-                renderGrievances();
-            };
-
-            resolveBtn.onclick = () => {
-                const remarks = remarksInput.value.trim();
-                if (!remarks) {
-                    alert('Please enter resolution remarks.');
-                    return;
-                }
-                g.status = 'Resolved';
-                g.resolution = remarks;
-                document.getElementById('grievanceModal').classList.remove('active');
-                renderGrievances();
-            };
-        } else {
-            document.getElementById('grievanceActionButtons').style.display = 'none';
-            resSection.style.display = 'block';
-            remarksInput.value = g.resolution || 'No remarks provided.';
-            remarksInput.disabled = true;
+    async function renderGrievances() {
+        const tbody = document.getElementById('grievanceList');
+        if (!tbody) return;
+        const token = localStorage.getItem('uniflow_token');
+        if (!token) {
+            tbody.innerHTML = '<tr><td colspan="7">Please sign in as an HOD to view department grievances.</td></tr>';
+            return;
         }
 
+        try {
+            const headers = { 'Authorization': 'Bearer ' + token };
+            const [response, facultyResponse] = await Promise.all([
+                fetch('http://localhost:5000/api/grievances/hod/escalated', { headers }),
+                fetch('http://localhost:5000/api/grievances/hod/faculty-grievances', { headers })
+            ]);
+            const [data, facultyData] = await Promise.all([
+                response.json(),
+                facultyResponse.json()
+            ]);
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Failed to load escalated student grievances.');
+            }
+            if (!facultyResponse.ok || !facultyData.success) {
+                throw new Error(facultyData.message || 'Failed to load faculty grievances.');
+            }
+
+            hodGrievances = [
+                ...data.grievances.map(grievance => ({
+                    ...grievance,
+                    grievance_type: 'student',
+                    filed_by_name: grievance.student_name,
+                    assigned_to_name: grievance.faculty_name
+                })),
+                ...facultyData.grievances.map(grievance => ({
+                    ...grievance,
+                    grievance_type: 'faculty',
+                    filed_by_name: grievance.faculty_name,
+                    assigned_to_name: grievance.hod_name
+                }))
+            ];
+            if (hodGrievances.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:16px;">No unresolved grievances need your attention.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = hodGrievances.map(grievance => {
+                const status = grievance.grievance_type === 'faculty'
+                    ? grievance.hod_resolved_at
+                        ? 'Awaiting faculty confirmation'
+                        : 'Needs HOD response'
+                    : 'Escalated';
+                return `
+                    <tr>
+                        <td>${escapeGrievanceHtml(new Date(grievance.created_at).toLocaleDateString())}</td>
+                        <td>${escapeGrievanceHtml(grievance.filed_by_name)}</td>
+                        <td>${escapeGrievanceHtml(grievance.assigned_to_name)}</td>
+                        <td>${escapeGrievanceHtml(grievance.subject)}</td>
+                        <td>${escapeGrievanceHtml(new Date(grievance.due_at).toLocaleDateString())}</td>
+                        <td style="font-weight:600;">${escapeGrievanceHtml(status)}</td>
+                        <td><button class="action-btn" onclick="viewGrievance(${grievance.id}, '${grievance.grievance_type}')">View</button></td>
+                    </tr>
+                `;
+            }).join('');
+        } catch (error) {
+            console.error('Load HOD grievances error:', error);
+            tbody.innerHTML = `<tr><td colspan="7" role="alert">${escapeGrievanceHtml(error.message)}</td></tr>`;
+        }
+    }
+
+    window.viewGrievance = function(id, grievanceType = 'student') {
+        const grievance = hodGrievances.find(item => item.id === id && item.grievance_type === grievanceType);
+        if (!grievance) return;
+        activeHodGrievance = grievance;
+
+        const isFacultyGrievance = grievance.grievance_type === 'faculty';
+        const filerStatus = isFacultyGrievance
+            ? grievance.faculty_confirmed_at ? 'Confirmed resolved' : 'Not confirmed'
+            : grievance.student_resolved_at ? 'Confirmed resolved' : 'Not confirmed';
+        const responderStatus = isFacultyGrievance
+            ? grievance.hod_resolved_at ? 'Marked resolved' : 'Not marked resolved'
+            : grievance.faculty_resolved_at ? 'Marked resolved' : 'Not marked resolved';
+        document.getElementById('grievanceDetails').innerHTML = `
+            <p><strong>Department:</strong> ${escapeGrievanceHtml(grievance.department_name)}</p>
+            <p><strong>Filed by:</strong> ${escapeGrievanceHtml(grievance.filed_by_name)}</p>
+            <p><strong>Assigned to:</strong> ${escapeGrievanceHtml(grievance.assigned_to_name)}</p>
+            <p><strong>Category:</strong> ${escapeGrievanceHtml(grievance.category)}</p>
+            <p><strong>Subject:</strong> ${escapeGrievanceHtml(grievance.subject)}</p>
+            <p><strong>Description:</strong></p>
+            <p style="white-space:pre-wrap; padding:16px; background:#f1f5f9; border-radius:8px;">${escapeGrievanceHtml(grievance.details)}</p>
+            <p><strong>Filed:</strong> ${escapeGrievanceHtml(new Date(grievance.created_at).toLocaleString())}</p>
+            <p><strong>7-day deadline:</strong> ${escapeGrievanceHtml(new Date(grievance.due_at).toLocaleString())}</p>
+            <p><strong>${isFacultyGrievance ? 'HOD' : 'Assigned faculty'}:</strong> ${responderStatus} · <strong>${isFacultyGrievance ? 'Faculty' : 'Student'}:</strong> ${filerStatus}</p>
+            ${grievance.resolution_comment ? `<p><strong>Resolution comment:</strong></p><p style="white-space:pre-wrap; padding:12px; background:#f1f5f9; border-radius:8px;">${escapeGrievanceHtml(grievance.resolution_comment)}</p>` : ''}
+        `;
+        const resolveButton = document.getElementById('hodResolveGrievanceBtn');
+        resolveButton.hidden = !isFacultyGrievance || Boolean(grievance.hod_resolved_at || grievance.resolved_at);
+        document.getElementById('hodResolutionCommentField').hidden = resolveButton.hidden;
+        document.getElementById('hodResolutionComment').value = '';
         document.getElementById('grievanceModal').classList.add('active');
     };
+
+    document.getElementById('hodResolveGrievanceBtn')?.addEventListener('click', async () => {
+        if (!activeHodGrievance || activeHodGrievance.grievance_type !== 'faculty') return;
+        const button = document.getElementById('hodResolveGrievanceBtn');
+        button.disabled = true;
+        try {
+            const token = localStorage.getItem('uniflow_token');
+            const response = await fetch(`http://localhost:5000/api/grievances/${activeHodGrievance.id}/hod-resolved`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    resolution_comment: document.getElementById('hodResolutionComment').value
+                })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Could not mark grievance resolved.');
+            }
+
+            document.getElementById('grievanceModal').classList.remove('active');
+            await renderGrievances();
+            alert(data.message);
+        } catch (error) {
+            console.error('Mark faculty grievance resolved by HOD error:', error);
+            alert(error.message);
+        } finally {
+            button.disabled = false;
+        }
+    });
 
     document.getElementById('closeGrievanceModal').onclick = () => {
         document.getElementById('grievanceModal').classList.remove('active');
@@ -1518,8 +1668,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    let hodDataLoadPromise;
+
     async function fetchAndRenderHodSummary() {
-        await fetchAllHodData();
+        await (hodDataLoadPromise || fetchAllHodData());
     }
 
     // Flagship: Overall Comprehensive Workload Graph with Red Threshold Line
@@ -1529,39 +1681,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const subtitle = document.getElementById('chartSubtitle');
         const badge = document.getElementById('thresholdBadge');
-        if (subtitle) subtitle.textContent = 'Faculty Overall Workload vs Threshold (Academic + Cross-Domain)';
+        if (!hodDeptSummaryData || !Array.isArray(hodDeptSummaryData.faculty_summary)) {
+            if (workloadChartInstance) {
+                workloadChartInstance.destroy();
+                workloadChartInstance = null;
+            }
+            if (subtitle) subtitle.textContent = 'Overall workload is unavailable. Refresh to try again.';
+            if (badge) badge.style.display = 'none';
+            return;
+        }
+
+        if (subtitle) subtitle.textContent = 'Overall workload: academic units + cross-domain duties + active tasks';
         if (badge) {
             badge.style.display = 'inline-flex';
-            badge.innerHTML = '<span style="display: inline-block; width: 14px; border-top: 2px dashed #ef4444;"></span> Ceiling: 120 pts';
+            badge.innerHTML = '<span style="display: inline-block; width: 14px; border-top: 2px dashed #ef4444;"></span> Ceiling: 120 points';
         }
 
-        const facultyTotals = {};
-
-        // 1. Academic workload units
-        if (hodSummaryData && hodSummaryData.workload_master) {
-            hodSummaryData.workload_master.forEach(row => {
-                const name = row.faculty_name || 'Unknown';
-                if (!facultyTotals[name]) facultyTotals[name] = 0;
-                facultyTotals[name] += parseFloat(row.grand_total_workload_units || 0);
-            });
-        }
-
-        // 2. Cross-domain duty workload units
-        if (hodDeptSummaryData && hodDeptSummaryData.faculty_summary) {
-            hodDeptSummaryData.faculty_summary.forEach(f => {
-                const name = f.faculty_name;
-                if (!facultyTotals[name]) facultyTotals[name] = 0;
-                facultyTotals[name] += parseFloat(f.department_workload_hours || 0);
-            });
-        }
-
-        let labels = Object.keys(facultyTotals);
-        let values = Object.values(facultyTotals).map(v => parseFloat(v.toFixed(2)));
-
-        if (labels.length === 0) {
-            labels = ['Dr. Alan Turing', 'Grace Hopper', 'Linus Torvalds', 'Dr. Jane Smith', 'Dr. Alan Walker'];
-            values = [34.8, 88.5, 120.0, 165.0, 124.5];
-        }
+        const facultyRoster = hodDeptSummaryData.faculty_summary;
+        const labels = facultyRoster.map(f => f.faculty_name);
+        const values = facultyRoster.map(f => Number(f.overall_workload.toFixed(2)));
 
         const bgColors = labels.map((name, i) => getFacultyColor(name, i).bg);
         const borderColors = labels.map((name, i) => getFacultyColor(name, i).border);
@@ -1578,7 +1716,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [
                     {
                         type: 'bar',
-                        label: 'Overall Workload Units',
+                        label: 'Overall Workload Points',
                         data: values,
                         backgroundColor: bgColors,
                         borderColor: borderColors,
@@ -1591,7 +1729,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     },
                     {
                         type: 'line',
-                        label: 'Recommended Max Threshold (120 units)',
+                        label: 'Recommended Max Threshold (120 points)',
                         data: labels.map(() => thresholdVal),
                         borderColor: '#ef4444',
                         borderWidth: 2.5,
@@ -1617,14 +1755,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         callbacks: {
                             label: function(context) {
                                 if (context.dataset.type === 'line') {
-                                    return ` Workload Threshold: 120 units (Recommended Limit)`;
+                                    return ` Workload Threshold: 120 points (Recommended Limit)`;
                                 }
                                 const val = parseFloat(context.raw);
                                 const diff = (val - thresholdVal).toFixed(1);
+                                const faculty = facultyRoster[context.dataIndex];
+                                const breakdown = faculty
+                                    ? `Academic ${faculty.academic_workload_units.toFixed(2)} + duties ${faculty.overall_cross_domain_workload_hours.toFixed(2)} + active tasks ${faculty.active_task_workload_hours.toFixed(2)}`
+                                    : '';
                                 if (val > thresholdVal) {
-                                    return ` Workload: ${val} units (⚠️ Overload by +${diff} pts)`;
+                                    return ` Workload: ${val.toFixed(2)} points (over by +${diff}). ${breakdown}`;
                                 } else {
-                                    return ` Workload: ${val} units (✓ Safe capacity: ${Math.abs(diff)} pts below ceiling)`;
+                                    return ` Workload: ${val.toFixed(2)} points (${Math.abs(diff)} below ceiling). ${breakdown}`;
                                 }
                             }
                         }
@@ -1633,7 +1775,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 scales: {
                     y: {
                         beginAtZero: true,
-                        title: { display: true, text: 'Total Workload Units', color: '#a5b4fc', font: { weight: '600' } },
+                        title: { display: true, text: 'Overall Workload Points', color: '#a5b4fc', font: { weight: '600' } },
                         ticks: { color: '#e2e8f0' },
                         grid: { color: 'rgba(255,255,255,0.08)' }
                     },
@@ -1674,13 +1816,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        let labels = Object.keys(facultyTotals);
-        let values = Object.values(facultyTotals).map(v => parseFloat(v.toFixed(2)));
+        const facultyRoster = hodDeptSummaryData?.faculty_summary || [];
+        facultyRoster.forEach(f => {
+            if (!facultyTotals[f.faculty_name]) facultyTotals[f.faculty_name] = 0;
+        });
 
-        if (labels.length === 0) {
-            labels = ['Dr. Alan Turing', 'Grace Hopper', 'Linus Torvalds', 'Dr. Jane Smith', 'Dr. Alan Walker'];
-            values = isGrandTotal ? [34.8, 78.5, 118.0, 162.5, 124.5] : [10.0, 25.0, 32.0, 45.0, 30.0];
-        }
+        const labels = Object.keys(facultyTotals);
+        let values = Object.values(facultyTotals).map(v => parseFloat(v.toFixed(2)));
 
         const bgColors = labels.map((name, i) => getFacultyColor(name, i).bg);
         const borderColors = labels.map((name, i) => getFacultyColor(name, i).border);
@@ -1873,8 +2015,10 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('academicSubLinks').style.display = 'flex';
             if (deptDashboardContainer) deptDashboardContainer.style.display = 'none';
 
-            // Ensure academic summary is rendered
-            renderWorkloadChart('grand_total_workload_units', 'Total Academic Workload');
+            fetchAndRenderHodSummary().then(() => {
+                renderWorkloadChart('grand_total_workload_units', 'Total Academic Workload');
+                window.showSubTable('workload_master');
+            });
         });
     }
 
@@ -1913,10 +2057,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Expose showSubTable to global scope for inline onclick handler
     window.showSubTable = function(tableName) {
-        if (!hodSummaryData || !hodSummaryData[tableName]) return;
+        const container = document.getElementById('workloadSubTableContainer');
+        const content = document.getElementById('subTableContent');
+        const toggle = document.getElementById('toggleWorkloadTable');
+        const toggleIcon = document.getElementById('workloadTableToggleIcon');
+        const thead = document.getElementById('subTableHead');
+        const tbody = document.getElementById('subTableBody');
+        const titleEl = document.getElementById('subTableTitle');
+        if (!container || !content || !toggle || !toggleIcon || !thead || !tbody || !titleEl) return;
 
         // Update the Chart to show the selected metric
         const tableToMetricMap = {
+            'workload_master': { field: 'grand_total_workload_units', title: 'Total Academic Workload' },
             'teaching_loads': { field: 'teaching_load_units', title: 'Teaching Load Units' },
             'paper_and_assignment_setting': { field: 'question_setting_units', title: 'Question/Assignment Setting Units' },
             'preparation_and_course_factors': { field: 'prep_adjustment_units', title: 'Preparation Adjustment Units' },
@@ -1930,24 +2082,27 @@ document.addEventListener('DOMContentLoaded', () => {
             renderWorkloadChart(mapping.field, mapping.title);
         }
 
-        const container = document.getElementById('workloadSubTableContainer');
-        const thead = document.getElementById('subTableHead');
-        const tbody = document.getElementById('subTableBody');
-        const titleEl = document.getElementById('subTableTitle');
-        
         container.style.display = 'block';
+        content.hidden = false;
+        toggle.setAttribute('aria-expanded', 'true');
+        toggle.setAttribute('aria-label', 'Hide workload data table');
+        toggleIcon.textContent = 'expand_less';
         thead.innerHTML = '';
         tbody.innerHTML = '';
 
-        const data = hodSummaryData[tableName];
+        const data = hodSummaryData?.[tableName];
+        titleEl.textContent = tableName.replace(/_/g, ' ').toUpperCase() + ' DATA';
+        if (!Array.isArray(data)) {
+            tbody.innerHTML = '<tr><td style="padding:12px;">Academic workload data could not be loaded. Check the backend connection and refresh.</td></tr>';
+            return;
+        }
+
         if (data.length === 0) {
-            tbody.innerHTML = '<tr><td style="padding:12px;">No data available</td></tr>';
+            tbody.innerHTML = '<tr><td style="padding:12px;">No academic workload has been entered yet.</td></tr>';
             return;
         }
 
         let keys = Object.keys(data[0]).filter(k => k !== 'id' && k !== 'subject_id' && k !== 'faculty_id' && k !== 'created_at');
-        
-        titleEl.textContent = tableName.replace(/_/g, ' ').toUpperCase() + ' DATA';
 
         let headerHtml = '<tr>';
         keys.forEach(k => {
@@ -1971,6 +2126,22 @@ document.addEventListener('DOMContentLoaded', () => {
         tbody.innerHTML = bodyHtml;
     };
 
+    const workloadTableToggle = document.getElementById('toggleWorkloadTable');
+    const workloadTableContent = document.getElementById('subTableContent');
+    const workloadTableToggleIcon = document.getElementById('workloadTableToggleIcon');
+    if (workloadTableToggle && workloadTableContent && workloadTableToggleIcon) {
+        workloadTableToggle.addEventListener('click', () => {
+            workloadTableContent.hidden = !workloadTableContent.hidden;
+            const isExpanded = !workloadTableContent.hidden;
+            workloadTableToggle.setAttribute('aria-expanded', String(isExpanded));
+            workloadTableToggle.setAttribute(
+                'aria-label',
+                isExpanded ? 'Hide workload data table' : 'Show workload data table'
+            );
+            workloadTableToggleIcon.textContent = isExpanded ? 'expand_less' : 'expand_more';
+        });
+    }
+
     // =====================================================
     // --- HOD MULTI-DOMAIN WORKLOAD OVERVIEW & CHART LOGIC ---
     // =====================================================
@@ -1993,7 +2164,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: headers
             });
             const data = await res.json();
-            if (!data.success) return;
+            if (!res.ok || !data.success) {
+                throw new Error(data.message || `Request failed with HTTP ${res.status}.`);
+            }
 
             hodDeptSummaryData = data;
 
@@ -2004,37 +2177,11 @@ document.addEventListener('DOMContentLoaded', () => {
             renderHodDeptTable(data);
 
         } catch (error) {
-            console.warn(`Backend unavailable, using mock summary for category ${category}:`, error);
-            const mockData = {
-                category: category,
-                department_total_hours: 45.00,
-                department_average_hours: 22.50,
-                faculty_summary: [
-                    {
-                        faculty_id: 2,
-                        custom_id: 'FAC001',
-                        faculty_name: 'Grace Hopper',
-                        department_workload_hours: 32.50,
-                        number_of_tasks: 2,
-                        workload_share_pct: 72.2,
-                        interpretation: 'Above department average',
-                        tasks: []
-                    },
-                    {
-                        faculty_id: 3,
-                        custom_id: 'FAC002',
-                        faculty_name: 'Linus Torvalds',
-                        department_workload_hours: 12.50,
-                        number_of_tasks: 1,
-                        workload_share_pct: 27.8,
-                        interpretation: 'Below department average',
-                        tasks: []
-                    }
-                ]
-            };
-            hodDeptSummaryData = mockData;
-            renderHodDeptChart(mockData.faculty_summary, domain);
-            renderHodDeptTable(mockData);
+            console.error(`Unable to load ${category} workload:`, error);
+            const tbody = document.getElementById('hodDeptWorkloadTableBody');
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:var(--danger-color);">${error.message}</td></tr>`;
+            }
         }
     }
 
@@ -2046,13 +2193,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const badge = document.getElementById('thresholdBadge');
         if (subtitle) subtitle.textContent = domain.title;
 
-        let labels = facultySummary.map(f => f.faculty_name);
-        let values = facultySummary.map(f => parseFloat(f.department_workload_hours || 0));
-
-        if (labels.length === 0) {
-            labels = ['Grace Hopper', 'Linus Torvalds', 'Dr. Jane Smith', 'Dr. Alan Walker', 'Dr. Alan Turing'];
-            values = [32.5, 24.0, 40.0, 25.0, 36.0];
-        }
+        const labels = facultySummary.map(f => f.faculty_name);
+        const values = facultySummary.map(f => parseFloat(f.department_workload_hours || 0));
 
         const bgColors = labels.map((name, i) => getFacultyColor(name, i).bg);
         const borderColors = labels.map((name, i) => getFacultyColor(name, i).border);
@@ -2261,7 +2403,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- Init ---
-    fetchAllHodData();
+    hodDataLoadPromise = fetchAllHodData();
     renderOverview();
     renderSubjects();
     renderTimetable();
@@ -2270,5 +2412,11 @@ document.addEventListener('DOMContentLoaded', () => {
     renderChat();
     renderGrievances();
     renderFaculties();
+
+    window.setInterval(() => {
+        if (document.getElementById('grievances')?.classList.contains('active')) {
+            renderGrievances();
+        }
+    }, 60_000);
 
 });

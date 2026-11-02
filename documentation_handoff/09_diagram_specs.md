@@ -567,22 +567,26 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     Faculty->>UI: Enters assignment (Diff: 5, Due Date: Nov 10)
-    Faculty->>UI: Clicks "Check Collision"
+    Faculty->>UI: Clicks "Validate Workload & Assign"
     UI->>Ctrl: POST /api/faculty/student-assignments/check
-    Ctrl->>DB: Evaluates daily load for class on Nov 10 (Found existing Diff 8 -> 8 + 5 = 13 > 10)
-    Ctrl->>DB: Scans next 14 candidate days (checks candDaily + 5 <= 10)
+    Ctrl->>DB: Evaluates daily load for class on Nov 10 (Found existing Diff 12 -> 12 + 5 = 17 > 15)
+    Ctrl->>DB: Scans next 14 candidate days (checks daily <= 15 and rolling week <= 18)
     DB-->>Ctrl: Alternative dates [Nov 11, Nov 12, Nov 13, Nov 14]
     Ctrl-->>UI: HTTP 200 OK { can_assign: false, is_overloaded: true, alternative_dates: [...] }
     UI->>Faculty: Displays "Daily workload threshold exceeded" banner & alt date pills
     
-    alt Faculty Chooses Override
-        Faculty->>UI: Checks "Override Collision" and clicks "Publish"
-        UI->>Ctrl: POST /api/faculty/student-assignments { override_collision: true, ... }
-        Ctrl->>DB: BEGIN Transaction
-        Ctrl->>DB: INSERT INTO student_assignments (...) RETURNING id
-        Ctrl->>DB: INSERT INTO student_assignment_submissions (assignment_id, student_id, status='pending') FOR ALL enrolled students
-        Ctrl->>DB: COMMIT Transaction
-        Ctrl-->>UI: HTTP 201 Created { success: true, students_assigned: 2 }
+    alt Faculty selects a suggested date
+        Faculty->>UI: Selects safe alternative date
+        UI->>Ctrl: POST /api/faculty/student-assignments
+        Ctrl->>DB: Lock class/semester and recheck daily and rolling weekly workload
+        alt Workload remains within limits
+            Ctrl->>DB: Insert assignment and pending submissions in transaction
+            Ctrl->>DB: COMMIT Transaction
+            Ctrl-->>UI: HTTP 201 Created
+        else Workload changed or exceeds limit
+            Ctrl->>DB: ROLLBACK Transaction
+            Ctrl-->>UI: HTTP 409 Conflict with refreshed alternative dates
+        end
     end
 ```
 
@@ -688,13 +692,13 @@ flowchart TD
     CalcDaily --> QueryWeekly[(Query SUM difficulty in rolling window: due_date - 3 days to due_date + 3 days)]
     QueryWeekly --> CalcWeekly[resulting_weekly = current_weekly + difficulty]
     
-    CalcWeekly --> CheckDaily{resulting_daily > 10?}
+    CalcWeekly --> CheckDaily{resulting_daily > 15?}
     CheckDaily -- Yes --> SetCollision[has_collision = true, reason = 'Daily threshold exceeded']
     CheckDaily -- No --> CheckWeekly{resulting_weekly > 18?}
     CheckWeekly -- Yes --> SetCollision2[has_collision = true, reason = 'Weekly concentration exceeded']
     CheckWeekly -- No --> ClearCollision[has_collision = false]
     
-    SetCollision --> ScanDates[Scan forward 14 days for candDaily + difficulty <= 10]
+    SetCollision --> ScanDates[Scan forward 14 days for daily <= 15 and rolling weekly <= 18]
     SetCollision2 --> ScanDates
     ScanDates --> ReturnAlt[Return HTTP 200 can_assign: false with top 4 alternative dates]
     ClearCollision --> ReturnOK[Return HTTP 200 can_assign: true]

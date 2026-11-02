@@ -20,7 +20,7 @@ UniFlow's user interface is structured as a multi-page web application using sta
   - Google Material Symbols: `material-symbols-outlined` (imported via Google CDN).
 - **Visualization:** `Chart.js` (loaded via CDN `https://cdn.jsdelivr.net/npm/chart.js` in `UI/hod/dashboard.html:9` and `UI/faculty/dashboard.html:10`). Used to render animated bar charts for faculty workload analytics.
 - **Client Networking:** Native `window.fetch()` API communicating via JSON over HTTP.
-- **Client State Storage:** Browser `localStorage` (used for `uniflow_token`, `uniflow_currentUser`, and mocked state for timetable, admin tables, chat, and grievances).
+- **Client State Storage:** Browser `localStorage` (used for `uniflow_token`, `uniflow_currentUser`, and mocked state for timetable, admin tables, and chat). Student grievances are persisted through the backend.
 
 #### Design Token System (`UI/css/theme.css:1-40`)
 ```css

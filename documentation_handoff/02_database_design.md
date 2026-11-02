@@ -10,7 +10,7 @@
 
 ## 1. Schema Evolution & The Table Count Reconciliation
 
-A primary source of confusion in earlier UniFlow documentation was contradictory claims regarding table counts (10 tables in early markdown, 16 tables in presentation slides, 18 tables in `schema.sql`, and 27 tables in the live database).
+A primary source of confusion in earlier UniFlow documentation was contradictory claims regarding table counts (10 tables in early markdown, 16 tables in presentation slides, 18 tables in the earlier `schema.sql`, and 27 tables before the student grievance workflow).
 
 Here is the verified historical and architectural truth:
 
@@ -47,14 +47,16 @@ Here is the verified historical and architectural truth:
 │      16. department_roles_master                                            │
 │      17. department_tasks_master                                            │
 │      18. faculty_department_workload                                        │
-│    • This brought backend/schema.sql to exactly 18 active tables.           │
+│    • Student grievances add student_grievances as table 19.                │
+│    • Faculty-to-HOD grievances add faculty_hod_grievances as table 20.     │
+│    • backend/schema.sql now defines 20 active tables.                      │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ 4. LIVE DATABASE STATUS (Live Query of information_schema.tables)           │
-│    • Exactly 27 physical tables exist in the public PostgreSQL schema.      │
-│    • 18 active production tables + 9 leftover prototype tables              │
+│    • 29 physical tables exist after the additive grievance migrations.      │
+│    • 20 active tables + 9 leftover prototype tables                         │
 │      (attendance, chat_participants, chat_threads, grievances, marks,       │
 │       messages, student_enrollments, timetable, timetable_faculty).         │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -86,15 +88,17 @@ The following row counts were captured immediately following execution of `npm r
 | 16 | `department_roles_master` | **ACTIVE** (Master Catalog Roles) | `schema.sql:210-216`, `initWorkloadTables.js:111-117` | **38** |
 | 17 | `department_tasks_master` | **ACTIVE** (Master Catalog Tasks) | `schema.sql:219-229`, `initWorkloadTables.js:120-130` | **102** |
 | 18 | `faculty_department_workload` | **ACTIVE** (Allocated Domain Tasks)| `schema.sql:232-250`, `initWorkloadTables.js:133-151` | **20** |
-| 19 | `attendance` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
-| 20 | `chat_participants` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
-| 21 | `chat_threads` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
-| 22 | `grievances` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
-| 23 | `marks` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
-| 24 | `messages` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
-| 25 | `student_enrollments` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
-| 26 | `timetable` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
-| 27 | `timetable_faculty` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
+| 19 | `student_grievances` | **ACTIVE** (Student/Faculty/HOD resolution workflow, with faculty resolution comments) | `schema.sql`, `initGrievanceTables.js` | **0 before feature verification** |
+| 20 | `faculty_hod_grievances` | **ACTIVE** (Faculty/HOD resolution workflow, with HOD resolution comments) | `schema.sql`, `initGrievanceTables.js` | **0 before feature verification** |
+| 21 | `attendance` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
+| 22 | `chat_participants` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
+| 23 | `chat_threads` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
+| 24 | `grievances` | *LEGACY PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
+| 25 | `marks` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
+| 26 | `messages` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
+| 27 | `student_enrollments` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
+| 28 | `timetable` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
+| 29 | `timetable_faculty` | *PROTOTYPE (UNCONNECTED)* | `changes.docx` | **0** |
 
 ---
 

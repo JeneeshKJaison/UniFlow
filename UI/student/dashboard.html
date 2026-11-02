@@ -304,11 +304,11 @@
                 <div class="dashboard-grid">
                     <div class="glass-card" style="padding: 24px;">
                         <h3>Submit a Grievance</h3>
-                        <p style="font-size: 0.85rem; margin-bottom: 16px; color: var(--text-light);">Have an issue? Let us know so the administration can help you.</p>
+                        <p style="font-size: 0.85rem; margin-bottom: 16px; color: var(--text-light);">Choose a faculty member. They have 7 days to respond before an unresolved grievance is escalated to your HOD.</p>
                         <form id="grievanceForm">
                             <div class="form-group" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
                                 <label style="font-size: 0.9rem; font-weight: 600; color: #1e293b;">Category</label>
-                                <select style="padding: 11px 14px; border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; border-radius: var(--border-radius-sm); font-family: 'Poppins', sans-serif; font-size: 0.95rem;" required>
+                                <select id="grievanceCategory" style="padding: 11px 14px; border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; border-radius: var(--border-radius-sm); font-family: 'Poppins', sans-serif; font-size: 0.95rem;" required>
                                     <option value="" disabled selected>Select Category</option>
                                     <option value="academic">Academic Issue</option>
                                     <option value="facility">Infrastructure/Facility</option>
@@ -317,12 +317,18 @@
                                 </select>
                             </div>
                             <div class="form-group" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
-                                <label style="font-size: 0.9rem; font-weight: 600; color: #1e293b;">Subject</label>
-                                <input type="text" placeholder="Brief subject" style="padding: 11px 14px; border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; border-radius: var(--border-radius-sm); font-family: 'Poppins', sans-serif; font-size: 0.95rem;" required>
+                                <label for="grievanceFaculty" style="font-size: 0.9rem; font-weight: 600; color: #1e293b;">Faculty</label>
+                                <select id="grievanceFaculty" style="padding: 11px 14px; border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; border-radius: var(--border-radius-sm); font-family: 'Poppins', sans-serif; font-size: 0.95rem;" required>
+                                    <option value="">Loading faculty...</option>
+                                </select>
                             </div>
                             <div class="form-group" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
-                                <label style="font-size: 0.9rem; font-weight: 600; color: #1e293b;">Description</label>
-                                <textarea rows="4" placeholder="Detail your grievance here..." style="padding: 11px 14px; border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; border-radius: var(--border-radius-sm); font-family: 'Poppins', sans-serif; font-size: 0.95rem; resize: vertical;" required></textarea>
+                                <label for="grievanceSubject" style="font-size: 0.9rem; font-weight: 600; color: #1e293b;">Subject</label>
+                                <input id="grievanceSubject" type="text" maxlength="200" placeholder="Brief subject" style="padding: 11px 14px; border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; border-radius: var(--border-radius-sm); font-family: 'Poppins', sans-serif; font-size: 0.95rem;" required>
+                            </div>
+                            <div class="form-group" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+                                <label for="grievanceDetailsInput" style="font-size: 0.9rem; font-weight: 600; color: #1e293b;">Description</label>
+                                <textarea id="grievanceDetailsInput" rows="4" maxlength="5000" placeholder="Detail your grievance here..." style="padding: 11px 14px; border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; border-radius: var(--border-radius-sm); font-family: 'Poppins', sans-serif; font-size: 0.95rem; resize: vertical;" required></textarea>
                             </div>
                             <button type="submit" class="btn-primary" style="padding: 12px; font-weight: 600;">Submit Grievance</button>
                         </form>
@@ -330,27 +336,8 @@
 
                     <div class="glass-panel" style="padding: 24px;">
                         <h3>My Grievances</h3>
-                        <div style="margin-top: 16px;">
-                            <div class="announcement-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
-                                <div>
-                                    <div class="announcement-title" style="margin-bottom: 4px;">Library Wi-Fi Connectivity</div>
-                                    <p style="font-size: 0.85rem;">The Wi-Fi in the reading room keeps dropping.</p>
-                                    <div style="font-size: 0.8rem; color: var(--text-light); margin-top: 4px;">Submitted: Jul 10, 2026 &bull; Category: Facility</div>
-                                </div>
-                                <div style="text-align: right;">
-                                    <span class="status-badge" style="background: rgba(46, 204, 113, 0.2); color: #27ae60; display: inline-block;">Resolved</span>
-                                </div>
-                            </div>
-                            <div class="announcement-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
-                                <div>
-                                    <div class="announcement-title" style="margin-bottom: 4px;">Grade Discrepancy in CS301</div>
-                                    <p style="font-size: 0.85rem;">My mid-term marks are not updated correctly on the portal.</p>
-                                    <div style="font-size: 0.8rem; color: var(--text-light); margin-top: 4px;">Submitted: Jul 21, 2026 &bull; Category: Academic</div>
-                                </div>
-                                <div style="text-align: right;">
-                                    <span class="status-badge status-pending" style="display: inline-block;">Under Review</span>
-                                </div>
-                            </div>
+                        <div id="myGrievancesList" style="margin-top: 16px;" aria-live="polite">
+                            <p style="color: var(--text-light);">Loading grievances...</p>
                         </div>
                     </div>
                 </div>

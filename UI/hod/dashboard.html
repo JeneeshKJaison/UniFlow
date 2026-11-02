@@ -130,6 +130,7 @@
 
                             <!-- Sub-Categories Menu (Hidden initially) -->
                             <div style="flex: 1; min-width: 250px; display: none; flex-direction: column; gap: 8px;" id="academicSubLinks">
+                                <button class="btn-secondary" style="text-align: left; padding: 12px; border-radius: 8px; background: transparent; border: 1px solid var(--primary-color); color: var(--text-color);" onclick="showSubTable('workload_master')">Academic Workload by Faculty</button>
                                 <button class="btn-secondary" style="text-align: left; padding: 12px; border-radius: 8px; background: transparent; border: 1px solid var(--primary-color); color: var(--text-color);" onclick="showSubTable('teaching_loads')">Teaching Load Units</button>
                                 <button class="btn-secondary" style="text-align: left; padding: 12px; border-radius: 8px; background: transparent; border: 1px solid var(--primary-color); color: var(--text-color);" onclick="showSubTable('paper_and_assignment_setting')">Question/Assignment Setting Units</button>
                                 <button class="btn-secondary" style="text-align: left; padding: 12px; border-radius: 8px; background: transparent; border: 1px solid var(--primary-color); color: var(--text-color);" onclick="showSubTable('preparation_and_course_factors')">Preparation Adjustment Units</button>
@@ -142,13 +143,22 @@
 
                         <!-- Data Table Container (Hidden initially) -->
                         <div id="workloadSubTableContainer" style="margin-top: 24px; display: none; overflow-x: auto;">
-                            <h4 id="subTableTitle" style="color: var(--primary-color); margin-bottom: 12px;">Data View</h4>
-                            <table style="width: 100%; border-collapse: collapse;">
-                                <thead id="subTableHead">
-                                </thead>
-                                <tbody id="subTableBody">
-                                </tbody>
-                            </table>
+                            <div class="workload-table-heading">
+                                <h4 id="subTableTitle" style="color: var(--primary-color); margin: 0;">Data View</h4>
+                                <button id="toggleWorkloadTable" class="workload-table-toggle" type="button"
+                                    aria-expanded="false" aria-controls="subTableContent"
+                                    aria-label="Show workload data table">
+                                    <span id="workloadTableToggleIcon" class="material-symbols-outlined" aria-hidden="true">expand_more</span>
+                                </button>
+                            </div>
+                            <div id="subTableContent" hidden>
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <thead id="subTableHead">
+                                    </thead>
+                                    <tbody id="subTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
 
                         <!-- Faculty-wise Multi-Domain Workload Dashboard Container -->
@@ -408,18 +418,30 @@
                             </div>
 
                             <div class="form-group">
-                                <label>Subject</label>
-                                <select id="taskSubject" required>
+                                <label for="taskAssignmentType">Work Category</label>
+                                <select id="taskAssignmentType" required>
+                                    <option value="subject">Subject-related work</option>
+                                    <option value="other">Other work</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="taskSubjectGroup">
+                                <label for="taskSubject">Subject</label>
+                                <select id="taskSubject">
                                     <option value="">-- Select Subject --</option>
                                 </select>
+                            </div>
+                            <div class="form-group" id="taskOtherCategoryGroup" style="display: none;">
+                                <label for="taskOtherCategory">Work Category</label>
+                                <input type="text" id="taskOtherCategory" maxlength="255" placeholder="e.g. Administration, Research, Consultancy">
                             </div>
                             <div class="form-group">
                                 <label>Task Description</label>
                                 <input type="text" id="taskDesc" required placeholder="e.g. Prepare Question Paper">
                             </div>
                             <div class="form-group">
-                                <label>Difficulty Level (1-10)</label>
-                                <input type="number" id="taskDifficulty" min="1" max="10" required placeholder="e.g. 5">
+                                <label for="taskEstimatedHours">Estimated Hours Needed</label>
+                                <input type="number" id="taskEstimatedHours" min="0.25" step="0.25" required placeholder="e.g. 3.5">
+                                <small>1 estimated hour adds 1 workload point (120-point overall threshold).</small>
                             </div>
                             <div class="form-group">
                                 <label>Deadline Date</label>
@@ -485,6 +507,13 @@
                         <div class="calendar-grid" id="calendarGrid">
                             <!-- Populated by JS -->
                         </div>
+                    </div>
+                    <div class="calendar-workload-legend" aria-label="Daily assigned workload intensity">
+                        <span>Daily workload:</span>
+                        <span><i class="calendar-legend-swatch workload-low"></i> 1–5 points</span>
+                        <span><i class="calendar-legend-swatch workload-medium"></i> 5.01–10 points</span>
+                        <span><i class="calendar-legend-swatch workload-high"></i> 10.01–15 points</span>
+                        <span><i class="calendar-legend-swatch workload-overloaded"></i> Over 15 points</span>
                     </div>
 
                     <div id="calendarTaskDetails"
@@ -567,13 +596,16 @@
             <!-- Grievances Section -->
             <section id="grievances" class="content-section">
                 <div class="glass-panel" style="padding: 24px;">
-                    <h3>Faculty Grievances</h3>
+                    <h3>Department Grievances</h3>
+                    <p style="color: var(--text-light);">Review unresolved student grievances escalated after 7 days and faculty grievances filed directly with your department.</p>
                     <table style="margin-top: 16px;">
                         <thead>
                             <tr>
                                 <th>Date</th>
-                                <th>From</th>
+                                <th>Filed By</th>
+                                <th>Assigned To</th>
                                 <th>Subject</th>
+                                <th>Deadline</th>
                                 <th>Status</th>
                                 <th>Action</th>
                             </tr>
@@ -685,17 +717,12 @@
             <span class="close-modal" id="closeGrievanceModal" style="position: absolute; top: 16px; right: 16px; font-size: 1.6rem; cursor: pointer; color: #64748b; line-height: 1;">&times;</span>
             <h3 style="margin: 0 0 16px 0; color: #0f172a;">Grievance Details</h3>
             <div id="grievanceDetails" style="margin-top: 16px; margin-bottom: 16px; color: #1e293b;"></div>
-            <div id="grievanceResolutionSection" style="margin-bottom: 24px;">
-                <label style="display: block; margin-bottom: 8px; color: #1e293b; font-weight: 600;">Resolution Remarks:</label>
-                <textarea id="grievanceRemarks" rows="3"
-                    style="width: 100%; padding: 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; resize: vertical; outline: none; font-size: 0.95rem;"
-                    placeholder="Enter remarks to resolve..."></textarea>
+            <div id="hodResolutionCommentField" style="margin-top: 16px;" hidden>
+                <label for="hodResolutionComment" style="display: block; margin-bottom: 6px; font-weight: 600; color: #1e293b;">Resolution comment (optional)</label>
+                <textarea id="hodResolutionComment" maxlength="2000" rows="3" placeholder="Add a note about how this grievance was resolved..."
+                    style="width: 100%; padding: 10px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; resize: vertical;"></textarea>
             </div>
-            <div id="grievanceActionButtons" style="display: flex; gap: 12px; margin-top: 16px;">
-                <button class="btn-secondary" id="sendRemarkBtn"
-                    style="flex: 1; padding: 12px; font-weight: 600;">Send Remark</button>
-                <button class="btn-primary" id="resolveGrievanceBtn" style="flex: 1; padding: 12px; font-weight: 600;">Mark as Resolved</button>
-            </div>
+            <button type="button" class="btn-primary" id="hodResolveGrievanceBtn" style="width: 100%; margin-top: 8px;" hidden>Mark as resolved</button>
         </div>
     </div>
 
@@ -781,7 +808,7 @@
                 <h4
                     style="margin-bottom: 10px; color: #0b7a75; display: flex; align-items: center; gap: 6px; font-size: 1rem;">
                     <span class="material-symbols-outlined" style="font-size: 20px;">person_add</span>
-                    Alternative Faculty Available (Teaching this subject with capacity):
+                    Alternative Faculty Available (with capacity):
                 </h4>
                 <div id="altFacultyList" style="display: flex; flex-direction: column; gap: 8px;"></div>
             </div>

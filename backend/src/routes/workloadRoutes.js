@@ -72,29 +72,19 @@ router.get(
 // Department Workload Routes
 // ==========================================
 
-// Helper middleware for optional/flexible auth on department workload routes
-const jwt = require("jsonwebtoken");
-
-const flexibleAuth = (req, res, next) => {
-    try {
-        const authHeader = req.headers.authorization;
-        if (authHeader) {
-            const token = authHeader.split(" ")[1];
-            if (token && token !== "null" && token !== "undefined") {
-                const decoded = jwt.verify(token, process.env.JWT_SECRET);
-                req.user = decoded;
-                return next();
-            }
+// Workload allocation changes and reads always belong to the authenticated faculty account.
+const authenticateFaculty = (req, res, next) => {
+    authenticateToken(req, res, () => {
+        if (req.user?.role !== "faculty") {
+            return res.status(403).json({ success: false, message: "Only faculty can access their workload allocations." });
         }
-    } catch (e) {
-        // Fallback below
-    }
-    req.user = { userId: 2, id: 2, role: "faculty", name: "Grace Hopper" };
-    next();
+        next();
+    });
 };
 
 const flexibleHodAuth = (req, res, next) => {
     try {
+        const jwt = require("jsonwebtoken");
         const authHeader = req.headers.authorization;
         if (authHeader) {
             const token = authHeader.split(" ")[1];
@@ -126,21 +116,21 @@ router.get(
 // Get logged-in faculty member's department/institutional/other workload
 router.get(
     "/department/faculty",
-    flexibleAuth,
+    authenticateFaculty,
     getFacultyDepartmentWorkload
 );
 
 // Save/update workload task for logged-in faculty
 router.post(
     "/department/faculty",
-    flexibleAuth,
+    authenticateFaculty,
     saveFacultyDepartmentWorkload
 );
 
 // Delete workload task for logged-in faculty
 router.delete(
     "/department/faculty/:id",
-    flexibleAuth,
+    authenticateFaculty,
     deleteFacultyDepartmentWorkload
 );
 

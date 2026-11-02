@@ -510,8 +510,6 @@
                             style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
                             <button type="button" id="btnCancelAssignment" class="btn-secondary"
                                 style="padding: 10px 20px;">Cancel</button>
-                            <button type="button" id="btnOverrideAssignment" class="btn-primary"
-                                style="background: #ea580c; border: none; color: #ffffff; padding: 10px 20px; font-weight: 600;">Assign Anyway (Override)</button>
                         </div>
                     </div>
                 </div>
@@ -600,16 +598,64 @@
             <!-- 7. Grievances Section -->
             <section id="grievances" class="content-section">
                 <div class="glass-panel" style="padding: 24px;">
+                    <h3>File a Grievance with Your HOD</h3>
+                    <p style="color: var(--text-light);">Your HOD has 7 days to respond. The grievance is resolved only after your HOD marks it resolved and you confirm.</p>
+                    <form id="facultyHodGrievanceForm" style="display: grid; gap: 14px; max-width: 720px; margin: 18px 0 28px;">
+                        <div class="form-group" style="margin: 0;">
+                            <label for="facultyGrievanceDepartment" style="display: block; margin-bottom: 6px; font-weight: 600;">Department / HOD</label>
+                            <select id="facultyGrievanceDepartment" required style="width: 100%; padding: 11px 14px; border-radius: 8px; border: 1.5px solid #cbd5e1; background: #fff; color: #0f172a;">
+                                <option value="">Loading your department HODs...</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label for="facultyGrievanceCategory" style="display: block; margin-bottom: 6px; font-weight: 600;">Category</label>
+                            <select id="facultyGrievanceCategory" required style="width: 100%; padding: 11px 14px; border-radius: 8px; border: 1.5px solid #cbd5e1; background: #fff; color: #0f172a;">
+                                <option value="academic">Academic Issue</option>
+                                <option value="facility">Facility</option>
+                                <option value="hostel">Hostel</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label for="facultyGrievanceSubject" style="display: block; margin-bottom: 6px; font-weight: 600;">Subject</label>
+                            <input id="facultyGrievanceSubject" type="text" maxlength="200" required placeholder="Brief subject" style="width: 100%; padding: 11px 14px; border-radius: 8px; border: 1.5px solid #cbd5e1; background: #fff; color: #0f172a;">
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label for="facultyGrievanceDetails" style="display: block; margin-bottom: 6px; font-weight: 600;">Description</label>
+                            <textarea id="facultyGrievanceDetails" maxlength="5000" required rows="4" placeholder="Describe your grievance..." style="width: 100%; padding: 11px 14px; border-radius: 8px; border: 1.5px solid #cbd5e1; background: #fff; color: #0f172a; resize: vertical;"></textarea>
+                        </div>
+                        <div><button type="submit" class="btn-primary">Submit Grievance</button></div>
+                    </form>
+
+                    <h3>My Grievances to HOD</h3>
+                    <table style="width: 100%; margin: 12px 0 32px;">
+                        <thead>
+                            <tr style="text-align: left; border-bottom: 1px solid var(--glass-border);">
+                                <th style="padding: 12px;">Date</th>
+                                <th style="padding: 12px;">HOD</th>
+                                <th style="padding: 12px;">Subject</th>
+                                <th style="padding: 12px;">Deadline</th>
+                                <th style="padding: 12px;">Status</th>
+                                <th style="padding: 12px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="facultyHodGrievanceList">
+                            <tr><td colspan="6">Loading your HOD grievances...</td></tr>
+                        </tbody>
+                    </table>
+
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                        <h3>My Grievances</h3>
-                        <button id="btnNewGrievance" class="btn-primary">+ File Grievance</button>
+                        <h3>Student Grievances Assigned to Me</h3>
                     </div>
+                    <p style="color: var(--text-light);">Mark a grievance resolved after addressing it. The student must then confirm resolution; otherwise it is escalated to the HOD after 7 days.</p>
                     <table style="width: 100%;">
                         <thead>
                             <tr style="text-align: left; border-bottom: 1px solid var(--glass-border);">
                                 <th style="padding: 12px;">Date</th>
+                                <th style="padding: 12px;">Student</th>
                                 <th style="padding: 12px;">Subject</th>
+                                <th style="padding: 12px;">Deadline</th>
                                 <th style="padding: 12px;">Status</th>
                                 <th style="padding: 12px;">Action</th>
                             </tr>
@@ -1343,29 +1389,6 @@
         </div>
     </div>
 
-    <!-- New Grievance Modal -->
-    <div class="modal-overlay" id="newGrievanceModal"
-        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.65); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(8px);">
-        <div style="background: #ffffff; width: 100%; max-width: 520px; padding: 28px; position: relative; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35);">
-            <span id="closeNewGrievanceModal"
-                style="position: absolute; top: 16px; right: 16px; font-size: 1.6rem; cursor: pointer; color: #64748b; line-height: 1;">&times;</span>
-            <h3 style="margin: 0 0 16px 0; color: #0f172a;">File New Grievance</h3>
-            <form id="newGrievanceForm">
-                <div class="form-group" style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">Subject</label>
-                    <input type="text" id="grivSubject" required placeholder="Brief subject..."
-                        style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #1e293b; font-size: 0.95rem;">
-                </div>
-                <div class="form-group" style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">Details</label>
-                    <textarea id="grivDetails" rows="5" required placeholder="Describe your grievance in detail..."
-                        style="width: 100%; padding: 12px; border-radius: var(--border-radius-sm); border: 1.5px solid #cbd5e1; background: #ffffff; color: #1e293b; font-size: 0.95rem;"></textarea>
-                </div>
-                <button type="submit" class="btn-primary" style="width: 100%; padding: 12px; font-weight: 600;">Submit Grievance</button>
-            </form>
-        </div>
-    </div>
-
     <!-- View Grievance Modal -->
     <div class="modal-overlay" id="viewGrievanceModal"
         style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.65); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(8px);">
@@ -1374,6 +1397,12 @@
                 style="position: absolute; top: 16px; right: 16px; font-size: 1.6rem; cursor: pointer; color: #64748b; line-height: 1;">&times;</span>
             <h3 style="margin: 0 0 16px 0; color: #0f172a;">Grievance Status</h3>
             <div id="viewGrievanceDetails" style="margin-top: 16px; color: #1e293b;"></div>
+            <div id="facultyResolutionCommentField" style="margin-top: 16px;">
+                <label for="facultyResolutionComment" style="display: block; margin-bottom: 6px; font-weight: 600; color: #1e293b;">Resolution comment (optional)</label>
+                <textarea id="facultyResolutionComment" maxlength="2000" rows="3" placeholder="Add a note about how this grievance was resolved..."
+                    style="width: 100%; padding: 10px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; background: #ffffff; color: #0f172a; resize: vertical;"></textarea>
+            </div>
+            <button type="button" class="btn-primary" id="facultyResolveGrievanceBtn" style="width: 100%; margin-top: 16px;">Mark as resolved</button>
         </div>
     </div>
 

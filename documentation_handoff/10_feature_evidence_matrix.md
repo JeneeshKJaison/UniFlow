@@ -26,7 +26,8 @@ This matrix connects every implemented and mocked feature of the UniFlow system 
 | **F-11: Student Assignment Listing & Turn-In** | `backend/src/controllers/studentController.js:78, 195` (`submitAssignment`) | `student_assignment_submissions` (`status = 'submitted'`) | `GET /api/student/assignments`, `PATCH /api/student/assignments/:id/submit` | `TC-ENG-B-02` (Status updated to submitted) | `ad9770c` | `student_turn_in_modal.png` | **IMPLEMENTED** |
 | **F-12: Faculty Multi-Domain Task Allocation** | `backend/src/controllers/workloadController.js:936` (`saveFacultyDepartmentWorkload`) | `faculty_department_workload` | `POST /api/workload/department/faculty` | Verified insert/update of duty hours | `7c189a7` | `faculty_dept_workload_tab.png` | **IMPLEMENTED** |
 | **F-13: Timetable Matrix Scheduler** | `UI/hod/js/hod.js:renderTimetable`, `UI/faculty/js/faculty.js` | None in DB (`timetable` has 0 rows) | None | Stored in `localStorage.getItem('uniflow_timetable')` | `5572c9f` | `hod_timetable_screen.png` | **MOCKED IN localStorage** |
-| **F-14: Grievance Lodging & Resolution** | `UI/hod/js/hod.js:openGrievanceModal`, `sendRemarkBtn.onclick` | None in DB (`grievances` has 0 rows) | None | In-memory object mutation (`hod.js:1263`) | `5572c9f` | `hod_grievance_modal.png` | **MOCKED IN localStorage** |
+| **F-14: Student Grievance, Dual Confirmation & HOD Escalation** | `UI/student/js/student.js`, `UI/faculty/js/faculty.js`, `UI/hod/js/hod.js` | `student_grievances` | `GET/POST/PATCH /api/grievances/*` | API-backed workflow; unresolved after 7 days is escalated to the assigned department HOD | Current implementation | Student, faculty, and HOD grievance screens | **IMPLEMENTED** |
+| **F-14a: Faculty Grievance to HOD & Dual Confirmation** | `UI/faculty/js/faculty.js`, `UI/hod/js/hod.js` | `faculty_hod_grievances` | `GET/POST/PATCH /api/grievances/*` | Faculty files with their department HOD; both HOD and faculty confirm resolution within the seven-day window | Current implementation | Faculty filing/tracking and HOD response screens | **IMPLEMENTED** |
 | **F-15: Department Messaging / Chat** | `UI/hod/js/hod.js:renderChat` | None in DB (`chat_threads` has 0 rows) | None | Hardcoded array in `UI/hod/js/hod.js:1894-1925` | `5572c9f` | `hod_chat_widget.png` | **FRONTEND ONLY (STATIC)** |
 | **F-16: Admin Department & Course Management** | `UI/admin/js/admin.js:renderDepartments`, `renderCourses` | None in DB (Operates in browser) | None | Stored in `localStorage.getItem('uniflow_dataStore')` | `5572c9f`, `03ae98b` | `admin_depts_screen.png` | **MOCKED IN localStorage** |
 | **F-17: Admin User Enrollment & Password Management** | `UI/admin/js/admin.js:saveUser`, `resetPassword` | None in DB | None | Saves user credentials to `localStorage` | `f8a4fc9`, `03ae98b` | `admin_users_modal.png` | **MOCKED IN localStorage** |
@@ -65,7 +66,7 @@ If live browser automation encounters sandbox or driver constraints, each screen
 ### 6. `faculty_collision_alert.png` (Engine B)
 - **Action:** On Faculty Dashboard, click **"Create Assignment"**.
 - **Test Input:** Subject: "Operating Systems", Difficulty: 5, Due Date: Select date where another assignment already exists (e.g. `2026-11-10`).
-- **Visuals:** Collision alert banner displays: "Daily workload threshold exceeded (13 pts > 10 pts max)" and renders 4 alternative date buttons.
+- **Visuals:** Collision alert banner displays when daily workload exceeds 15 points and offers dates meeting both daily and rolling weekly limits.
 
 ### 7. `student_dashboard_gauge.png`
 - **Login Credentials:** `student@uniflow.edu` / `student123`

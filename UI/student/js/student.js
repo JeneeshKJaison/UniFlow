@@ -21,6 +21,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (targetId === 'overview') fetchStudentDashboard();
             if (targetId === 'courses') fetchStudentCourses();
             if (targetId === 'workload') fetchStudentAssignments();
+            if (targetId === 'grievance') {
+                fetchGrievanceFaculty();
+                fetchStudentGrievances();
+            }
         });
     });
 
@@ -291,8 +295,171 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // Grievance filing and two-party resolution
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, character => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        })[character]);
+    }
+
+    function grievanceHeaders(json = false) {
+        const headers = { 'Authorization': `Bearer ${authToken}` };
+        if (json) headers['Content-Type'] = 'application/json';
+        return headers;
+    }
+
+    async function fetchGrievanceFaculty() {
+        const select = document.getElementById('grievanceFaculty');
+        if (!select) return;
+
+        try {
+            const response = await fetch(`${API_URL}/api/grievances/faculty-options`, {
+                headers: grievanceHeaders()
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Could not load faculty options.');
+            }
+
+            select.innerHTML = '<option value="">Select a faculty member</option>';
+            data.faculty.forEach(faculty => {
+                const option = document.createElement('option');
+                option.value = faculty.id;
+                option.textContent = faculty.name;
+                select.appendChild(option);
+            });
+            if (data.faculty.length === 0) {
+                select.innerHTML = '<option value="">No faculty available in your department</option>';
+            }
+        } catch (error) {
+            console.error('Load grievance faculty error:', error);
+            select.innerHTML = '<option value="">Unable to load faculty</option>';
+        }
+    }
+
+    async function fetchStudentGrievances() {
+        const container = document.getElementById('myGrievancesList');
+        if (!container) return;
+
+        try {
+            const response = await fetch(`${API_URL}/api/grievances/student`, {
+                headers: grievanceHeaders()
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Could not load grievances.');
+            }
+
+            if (data.grievances.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-light);">You have not filed any grievances.</p>';
+                return;
+            }
+
+            container.innerHTML = data.grievances.map(grievance => {
+                const isResolved = Boolean(grievance.resolved_at);
+                const isEscalated = grievance.status === 'escalated';
+                const studentMarked = Boolean(grievance.student_resolved_at);
+                const facultyMarked = Boolean(grievance.faculty_resolved_at);
+                const status = isResolved
+                    ? 'Resolved by both parties'
+                    : isEscalated
+                        ? 'Escalated to HOD'
+                        : facultyMarked
+                            ? 'Faculty marked resolved — awaiting your confirmation'
+                            : 'Awaiting faculty resolution';
+                const dueAt = new Date(grievance.due_at).toLocaleString();
+                const submittedAt = new Date(grievance.created_at).toLocaleDateString();
+                const confirmation = `Faculty: ${facultyMarked ? 'Resolved' : 'Pending'} · You: ${studentMarked ? 'Confirmed' : 'Pending'}`;
+                const action = facultyMarked && !studentMarked && !isResolved
+                    ? `<button class="btn-primary" style="margin-top: 12px;" onclick="confirmStudentGrievance(${grievance.id})">Confirm resolved</button>`
+                    : '';
+
+                return `
+                    <article class="announcement-item" style="margin-top: 12px;">
+                        <div class="announcement-title">${escapeHtml(grievance.subject)}</div>
+                        <p>${escapeHtml(grievance.details)}</p>
+                        <div style="font-size: 0.8rem; color: var(--text-light); margin-top: 6px;">
+                            To: ${escapeHtml(grievance.faculty_name)} · Submitted: ${escapeHtml(submittedAt)} · Due: ${escapeHtml(dueAt)}
+                        </div>
+                        <div style="font-size: 0.85rem; margin-top: 8px; font-weight: 600;">${escapeHtml(status)}</div>
+                        <div style="font-size: 0.8rem; color: var(--text-light);">${escapeHtml(confirmation)}</div>
+                        ${grievance.resolution_comment ? `<p style="white-space:pre-wrap;"><strong>Faculty resolution comment:</strong> ${escapeHtml(grievance.resolution_comment)}</p>` : ''}
+                        ${isEscalated ? '<p style="color: #b45309; font-weight: 600;">Your department HOD has been notified because both confirmations were not received within 7 days.</p>' : ''}
+                        ${action}
+                    </article>
+                `;
+            }).join('');
+        } catch (error) {
+            console.error('Load student grievances error:', error);
+            container.innerHTML = `<p role="alert" style="color: #b91c1c;">${escapeHtml(error.message)}</p>`;
+        }
+    }
+
+    document.getElementById('grievanceForm')?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+
+        try {
+            const response = await fetch(`${API_URL}/api/grievances`, {
+                method: 'POST',
+                headers: grievanceHeaders(true),
+                body: JSON.stringify({
+                    faculty_id: document.getElementById('grievanceFaculty').value,
+                    category: document.getElementById('grievanceCategory').value,
+                    subject: document.getElementById('grievanceSubject').value,
+                    details: document.getElementById('grievanceDetailsInput').value
+                })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Could not file grievance.');
+            }
+
+            form.reset();
+            await fetchStudentGrievances();
+            alert(data.message);
+        } catch (error) {
+            console.error('File grievance error:', error);
+            alert(error.message);
+        } finally {
+            submitButton.disabled = false;
+        }
+    });
+
+    window.confirmStudentGrievance = async function(grievanceId) {
+        try {
+            const response = await fetch(`${API_URL}/api/grievances/${grievanceId}/student-resolved`, {
+                method: 'PATCH',
+                headers: grievanceHeaders()
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Could not confirm grievance resolution.');
+            }
+            await fetchStudentGrievances();
+            alert(data.message);
+        } catch (error) {
+            console.error('Confirm grievance resolution error:', error);
+            alert(error.message);
+        }
+    };
+
+    window.setInterval(() => {
+        if (document.getElementById('grievance')?.classList.contains('active')) {
+            fetchStudentGrievances();
+        }
+    }, 60_000);
+
     // Initial load
     fetchStudentDashboard();
     fetchStudentCourses();
     fetchStudentAssignments();
+    fetchGrievanceFaculty();
+    fetchStudentGrievances();
 });

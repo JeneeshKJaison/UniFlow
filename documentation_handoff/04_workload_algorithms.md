@@ -81,14 +81,14 @@ When $W_{\text{resulting}} > 15$:
 Prevents academic burnout caused by multiple professors scheduling heavy assignment deadlines for the same student cohort on the exact same date or within the same instructional week.
 
 ### 2.2 Mathematical Formulation & Limits
-- **Daily Cohort Threshold:** $\Delta_{\text{daily}} = 10$ points (`MAX_DAILY_STUDENT_WORKLOAD = 10` in `facultyController.js:4`).
+- **Daily Cohort Threshold:** $\Delta_{\text{daily}} = 15$ points (`MAX_DAILY_STUDENT_WORKLOAD = 15` in `facultyController.js`).
 - **Weekly Cohort Threshold:** $\Delta_{\text{weekly}} = 18$ points (`MAX_WEEKLY_STUDENT_WORKLOAD = 18` in `facultyController.js:5`).
 - **Target Student Cohort Identification:**
   Determined by the assigned subject's `course_id` (degree program) and `semester` (e.g. B.Tech CSE, Semester 5).
 - **1. Daily Workload Calculation:**
   $$W_{\text{daily}}(C, S, \text{due\_date}) = \sum_{a \in A(C, S, \text{due\_date})} D_a$$
   $$W_{\text{daily, resulting}} = W_{\text{daily}} + D_{\text{new}}$$
-  $$\text{IsDailyOverloaded} = (W_{\text{daily, resulting}} > 10)$$
+  $$\text{IsDailyOverloaded} = (W_{\text{daily, resulting}} > 15)$$
 - **2. Weekly Workload Calculation (Rolling 7-Day Window):**
   $$W_{\text{weekly}}(C, S, \text{due\_date}) = \sum_{a \in A_{\text{week}}(C, S, \text{due\_date})} D_a$$
   Where $A_{\text{week}}$ encompasses all assignments where:
@@ -117,27 +117,28 @@ WHERE course_id = $1 AND semester = $2
   AND due_date BETWEEN ($3::date - INTERVAL '3 days') AND ($3::date + INTERVAL '3 days');
 ```
 
-### 2.4 Alternative Dates Calculation (`facultyController.js:260-294`)
+### 2.4 Alternative Dates Calculation (`getAlternativeStudentAssignmentDates`)
 When a collision is detected, Engine B scans forward across the next 14 calendar days:
 ```javascript
-for (let offset = 1; offset <= 14; offset++) {
+for (let offset = 1; offset <= 14 && alternatives.length < 4; offset++) {
     const candidateDate = new Date(requestedDate);
-    candidateDate.setDate(requestedDate.getDate() + offset);
-    // Checks ONLY daily limit
-    if (candDaily + taskDiff <= MAX_DAILY_STUDENT_WORKLOAD) {
-        alternativeDates.push({ date: dateStr, resulting_workload: candResulting });
+    candidateDate.setUTCDate(candidateDate.getUTCDate() + offset);
+    const date = candidateDate.toISOString().slice(0, 10);
+    const workload = await getStudentWorkloadForDate(db, courseId, semester, date);
+    if (workload.daily + taskDiff <= MAX_DAILY_STUDENT_WORKLOAD &&
+        workload.weekly + taskDiff <= MAX_WEEKLY_STUDENT_WORKLOAD) {
+        alternatives.push({ date, resulting_workload: workload.daily + taskDiff });
     }
-    if (alternativeDates.length >= 4) break; // Returns top 4 recommendations
 }
 ```
-*Critical Audit Finding:* The alternative date scan checks **only** the daily threshold ($\le 10$). It omits the weekly check ($\le 18$) during alternative date discovery.
+Only dates meeting both the 15-point daily and 18-point rolling-week limits are suggested. Assignment creation rechecks both limits under a course/semester transaction lock and returns HTTP 409 with alternatives if the workload changed after the initial check.
 
-### 2.5 Execution Trace & Override Workflow
-1. Faculty opens Student Assignment modal (`UI/faculty/dashboard.html:#assignmentModal`).
-2. Faculty enters subject, difficulty, and proposed due date, then clicks **"Check Collision"** (`#checkCollisionBtn`).
+### 2.5 Execution Trace & Alternative-Date Workflow
+1. Faculty opens the Student Assignment section (`UI/faculty/dashboard.html:#assignWorkForm`).
+2. Faculty enters subject, difficulty, and proposed due date, then clicks **"Validate Workload & Assign"**.
 3. Frontend calls `POST /api/faculty/student-assignments/check`.
 4. If a collision occurs, frontend displays a red warning banner (`#collisionAlertBox`) with the reason and renders alternative date buttons.
-5. If the faculty member insists on publishing despite the collision, they can proceed if they check an override flag (`override_collision = true`). Otherwise, `POST /api/faculty/student-assignments` rejects with **HTTP 409 Conflict**.
+5. Faculty selects one of the suggested dates. If another assignment changes workload before saving, `POST /api/faculty/student-assignments` rejects with **HTTP 409 Conflict** and refreshed alternative dates. Overloaded dates cannot be force-published.
 6. When successfully published, a database transaction inserts into `student_assignments` and automatically provisions `student_assignment_submissions` for all enrolled students with `status = 'pending'`.
 
 ---

@@ -3,6 +3,20 @@ const pool = require('./db');
 async function initWorkloadTables() {
     try {
         await pool.query(`
+            ALTER TABLE tasks ADD COLUMN IF NOT EXISTS estimated_hours NUMERIC(8, 2);
+            ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assignment_type VARCHAR(20);
+            ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category_name VARCHAR(255);
+            ALTER TABLE tasks ALTER COLUMN difficulty DROP NOT NULL;
+            UPDATE tasks
+            SET assignment_type = CASE WHEN subject_id IS NULL THEN 'other' ELSE 'subject' END,
+                category_name = CASE
+                    WHEN subject_id IS NULL THEN COALESCE(category_name, 'General work')
+                    ELSE COALESCE(category_name, 'Subject-related')
+                END
+            WHERE assignment_type IS NULL OR category_name IS NULL;
+            ALTER TABLE tasks ALTER COLUMN assignment_type SET DEFAULT 'subject';
+            ALTER TABLE tasks ALTER COLUMN assignment_type SET NOT NULL;
+
             CREATE TABLE IF NOT EXISTS teaching_loads (
                 id SERIAL PRIMARY KEY,
                 subject_id INTEGER,

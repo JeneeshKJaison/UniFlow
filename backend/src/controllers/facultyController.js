@@ -1,8 +1,68 @@
 const pool = require('../config/db');
 
 // Configurable constants for Student Workload
-const MAX_DAILY_STUDENT_WORKLOAD = 10;
+const MAX_DAILY_STUDENT_WORKLOAD = 15;
 const MAX_WEEKLY_STUDENT_WORKLOAD = 18;
+
+function isValidDate(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const parsedDate = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(parsedDate.getTime()) && parsedDate.toISOString().slice(0, 10) === value;
+}
+
+async function getStudentWorkloadForDate(db, courseId, semester, dueDate) {
+    const result = await db.query(`
+        SELECT
+            COALESCE(SUM(difficulty) FILTER (WHERE due_date = $3::date), 0) AS daily_workload,
+            COALESCE(SUM(difficulty), 0) AS weekly_workload
+        FROM student_assignments
+        WHERE course_id = $1
+          AND semester = $2
+          AND due_date BETWEEN ($3::date - INTERVAL '3 days') AND ($3::date + INTERVAL '3 days')
+    `, [courseId, semester, dueDate]);
+
+    return {
+        daily: Number(result.rows[0]?.daily_workload || 0),
+        weekly: Number(result.rows[0]?.weekly_workload || 0)
+    };
+}
+
+async function getAlternativeStudentAssignmentDates(db, courseId, semester, dueDate, taskDifficulty) {
+    const alternatives = [];
+    const requestedDate = new Date(`${dueDate}T00:00:00.000Z`);
+
+    for (let offset = 1; offset <= 14 && alternatives.length < 4; offset++) {
+        const candidateDate = new Date(requestedDate);
+        candidateDate.setUTCDate(candidateDate.getUTCDate() + offset);
+        const date = candidateDate.toISOString().slice(0, 10);
+        const workload = await getStudentWorkloadForDate(db, courseId, semester, date);
+        const resultingDailyWorkload = workload.daily + taskDifficulty;
+        const resultingWeeklyWorkload = workload.weekly + taskDifficulty;
+
+        if (resultingDailyWorkload <= MAX_DAILY_STUDENT_WORKLOAD &&
+            resultingWeeklyWorkload <= MAX_WEEKLY_STUDENT_WORKLOAD) {
+            alternatives.push({
+                date,
+                formatted_date: candidateDate.toLocaleDateString(undefined, {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    timeZone: 'UTC'
+                }),
+                current_workload: workload.daily,
+                task_difficulty: taskDifficulty,
+                resulting_workload: resultingDailyWorkload,
+                threshold: MAX_DAILY_STUDENT_WORKLOAD,
+                current_weekly_workload: workload.weekly,
+                resulting_weekly_workload: resultingWeeklyWorkload,
+                weekly_threshold: MAX_WEEKLY_STUDENT_WORKLOAD
+            });
+        }
+    }
+
+    return alternatives;
+}
 
 // =====================================================
 // 1. GET TASKS ASSIGNED TO LOGGED-IN FACULTY (From HOD)
@@ -20,6 +80,10 @@ const getMyTasks = async (req, res) => {
                 t.subject_id,
                 t.description,
                 t.difficulty,
+                t.estimated_hours,
+                COALESCE(t.estimated_hours, t.difficulty, 0) AS workload_points,
+                t.assignment_type,
+                t.category_name,
                 t.deadline,
                 t.scheduled_date,
                 t.status,
@@ -40,7 +104,7 @@ const getMyTasks = async (req, res) => {
         );
 
         const activeTasks = result.rows.filter(t => !t.status || t.status.toLowerCase() !== 'completed');
-        const totalWorkload = activeTasks.reduce((sum, t) => sum + (parseInt(t.difficulty) || 0), 0);
+        const totalWorkload = activeTasks.reduce((sum, t) => sum + Number(t.workload_points || 0), 0);
 
         return res.status(200).json({
             success: true,
@@ -173,18 +237,14 @@ const checkStudentWorkload = async (req, res) => {
         const facultyId = req.user.userId || req.user.id;
         const { subject_id, difficulty, due_date } = req.body;
 
-        if (!subject_id || !difficulty || !due_date) {
+        const subjectId = Number(subject_id);
+        const taskDiff = Number(difficulty);
+        if (!Number.isInteger(subjectId) || subjectId < 1 ||
+            !Number.isInteger(taskDiff) || taskDiff < 1 || taskDiff > 10 ||
+            !isValidDate(due_date)) {
             return res.status(400).json({
                 success: false,
-                message: 'Subject, difficulty, and due date are required.'
-            });
-        }
-
-        const taskDiff = parseInt(difficulty);
-        if (taskDiff < 1 || taskDiff > 10) {
-            return res.status(400).json({
-                success: false,
-                message: 'Difficulty must be between 1 and 10.'
+                message: 'Choose a subject, a difficulty from 1 to 10, and a valid due date.'
             });
         }
 
@@ -197,7 +257,7 @@ const checkStudentWorkload = async (req, res) => {
             JOIN subject_faculty sf ON s.id = sf.subject_id
             WHERE s.id = $1 AND sf.faculty_id = $2
             `,
-            [parseInt(subject_id), facultyId]
+            [subjectId, facultyId]
         );
 
         if (subjectRes.rows.length === 0) {
@@ -233,65 +293,22 @@ const checkStudentWorkload = async (req, res) => {
             [courseId, semester, due_date]
         );
 
-        const currentDailyWorkload = parseInt(dailyRes.rows[0]?.total_difficulty || 0);
+        const currentDailyWorkload = Number(dailyRes.rows[0]?.total_difficulty || 0);
         const existingAssignments = dailyRes.rows[0]?.assignments || [];
         const resultingDailyWorkload = currentDailyWorkload + taskDiff;
 
         // 2. Calculate Weekly Workload for this class (window of +- 3 days)
-        const weeklyRes = await pool.query(
-            `
-            SELECT COALESCE(SUM(difficulty), 0) AS total_difficulty
-            FROM student_assignments
-            WHERE course_id = $1 AND semester = $2
-              AND due_date BETWEEN ($3::date - INTERVAL '3 days') AND ($3::date + INTERVAL '3 days')
-            `,
-            [courseId, semester, due_date]
-        );
-        const currentWeeklyWorkload = parseInt(weeklyRes.rows[0]?.total_difficulty || 0);
+        const workload = await getStudentWorkloadForDate(pool, courseId, semester, due_date);
+        const currentWeeklyWorkload = workload.weekly;
         const resultingWeeklyWorkload = currentWeeklyWorkload + taskDiff;
 
         const isDailyOverloaded = resultingDailyWorkload > MAX_DAILY_STUDENT_WORKLOAD;
         const isWeeklyOverloaded = resultingWeeklyWorkload > MAX_WEEKLY_STUDENT_WORKLOAD;
         const hasCollision = isDailyOverloaded || isWeeklyOverloaded;
 
-        // If collision / overload detected -> Calculate Alternative Available Dates
-        let alternativeDates = [];
-        if (hasCollision) {
-            const requestedDate = new Date(due_date);
-
-            // Scan next 14 days
-            for (let offset = 1; offset <= 14; offset++) {
-                const candidateDate = new Date(requestedDate);
-                candidateDate.setDate(requestedDate.getDate() + offset);
-                const dateStr = candidateDate.toISOString().split('T')[0];
-
-                const candRes = await pool.query(
-                    `
-                    SELECT 
-                        COALESCE(SUM(difficulty), 0) AS daily_difficulty
-                    FROM student_assignments
-                    WHERE course_id = $1 AND semester = $2 AND due_date = $3
-                    `,
-                    [courseId, semester, dateStr]
-                );
-
-                const candDaily = parseInt(candRes.rows[0]?.daily_difficulty || 0);
-                const candResulting = candDaily + taskDiff;
-
-                if (candResulting <= MAX_DAILY_STUDENT_WORKLOAD) {
-                    alternativeDates.push({
-                        date: dateStr,
-                        formatted_date: candidateDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
-                        current_workload: candDaily,
-                        task_difficulty: taskDiff,
-                        resulting_workload: candResulting,
-                        threshold: MAX_DAILY_STUDENT_WORKLOAD
-                    });
-                }
-
-                if (alternativeDates.length >= 4) break; // Provide top 4 recommendations
-            }
-        }
+        const alternativeDates = hasCollision
+            ? await getAlternativeStudentAssignmentDates(pool, courseId, semester, due_date, taskDiff)
+            : [];
 
         return res.status(200).json({
             success: true,
@@ -337,19 +354,16 @@ const assignWorkToStudents = async (req, res) => {
     try {
         const facultyId = req.user.userId || req.user.id;
         const { subject_id, title, description, difficulty, due_date, max_marks } = req.body;
+        const subjectId = Number(subject_id);
+        const taskDiff = Number(difficulty);
+        const trimmedDescription = typeof description === 'string' ? description.trim() : '';
 
-        if (!subject_id || !description || !difficulty || !due_date) {
+        if (!Number.isInteger(subjectId) || subjectId < 1 ||
+            !trimmedDescription || !Number.isInteger(taskDiff) ||
+            taskDiff < 1 || taskDiff > 10 || !isValidDate(due_date)) {
             return res.status(400).json({
                 success: false,
-                message: 'Please fill in all required fields (subject, description, difficulty, due date).'
-            });
-        }
-
-        const taskDiff = parseInt(difficulty);
-        if (taskDiff < 1 || taskDiff > 10) {
-            return res.status(400).json({
-                success: false,
-                message: 'Difficulty must be between 1 and 10.'
+                message: 'Choose a subject, provide a description, select a difficulty from 1 to 10, and enter a valid due date.'
             });
         }
 
@@ -362,7 +376,7 @@ const assignWorkToStudents = async (req, res) => {
             JOIN subject_faculty sf ON s.id = sf.subject_id
             WHERE s.id = $1 AND sf.faculty_id = $2
             `,
-            [parseInt(subject_id), facultyId]
+            [subjectId, facultyId]
         );
 
         if (subjectRes.rows.length === 0) {
@@ -376,6 +390,45 @@ const assignWorkToStudents = async (req, res) => {
         const assignmentTitle = title || `${subject.code} - Assignment`;
 
         await client.query('BEGIN');
+        await client.query(
+            'SELECT pg_advisory_xact_lock($1::integer, $2::integer)',
+            [subject.course_id, subject.semester]
+        );
+
+        const currentWorkload = await getStudentWorkloadForDate(
+            client,
+            subject.course_id,
+            subject.semester,
+            due_date
+        );
+        const resultingDailyWorkload = currentWorkload.daily + taskDiff;
+        const resultingWeeklyWorkload = currentWorkload.weekly + taskDiff;
+        if (resultingDailyWorkload > MAX_DAILY_STUDENT_WORKLOAD ||
+            resultingWeeklyWorkload > MAX_WEEKLY_STUDENT_WORKLOAD) {
+            await client.query('ROLLBACK');
+            const alternativeDates = await getAlternativeStudentAssignmentDates(
+                pool,
+                subject.course_id,
+                subject.semester,
+                due_date,
+                taskDiff
+            );
+            return res.status(409).json({
+                success: false,
+                message: resultingDailyWorkload > MAX_DAILY_STUDENT_WORKLOAD
+                    ? `This class would exceed the ${MAX_DAILY_STUDENT_WORKLOAD}-point daily workload limit. Choose a suggested date.`
+                    : `This class would exceed the ${MAX_WEEKLY_STUDENT_WORKLOAD}-point weekly workload limit. Choose a suggested date.`,
+                workload: {
+                    current_daily_workload: currentWorkload.daily,
+                    resulting_daily_workload: resultingDailyWorkload,
+                    daily_threshold: MAX_DAILY_STUDENT_WORKLOAD,
+                    current_weekly_workload: currentWorkload.weekly,
+                    resulting_weekly_workload: resultingWeeklyWorkload,
+                    weekly_threshold: MAX_WEEKLY_STUDENT_WORKLOAD
+                },
+                alternative_dates: alternativeDates
+            });
+        }
 
         // 1. Insert Assignment
         const assignRes = await client.query(
@@ -400,7 +453,7 @@ const assignWorkToStudents = async (req, res) => {
                 subject.course_id,
                 subject.semester,
                 assignmentTitle,
-                description,
+                trimmedDescription,
                 taskDiff,
                 due_date,
                 parseInt(max_marks) || 100
